@@ -188,7 +188,7 @@
           let card = selected.type==='waste'
                      ? waste[waste.length-1]
                      : tableau[selected.pi][selected.ci];
-          if(card && card.suit===suit && order.indexOf(card.rank)===dest.length){
+          if(card&&card.suit===suit&&order.indexOf(card.rank)===dest.length){
             dest.push(card);
             if(selected.type==='waste') waste.pop();
             else tableau[selected.pi].pop();
@@ -197,12 +197,12 @@
         };
       });
 
-      // TABLEAU with dynamic overlap & layering
+      // TABLEAU with 35% overlap
       pileEls.forEach(el=>{
         const idx=parseInt(el.dataset.index,10),
               pileArr=tableau[idx]||[],
               h=el.clientHeight,
-              overlap=h*0.2,
+              overlap=h*0.35,        // increased from 0.2 to 0.35
               fs=h*0.3+'px';
         pileArr.forEach((card,ci)=>{
           const c=document.createElement('div');
@@ -235,9 +235,9 @@
                        : tableau[selected.pi][selected.ci];
             const top=dest[dest.length-1],
                   ciCard=order.indexOf(card.rank),
-                  ciTop = top? order.indexOf(top.rank): -1;
-            if((!top && card.rank==='K') ||
-               (top && ciTop===ciCard+1 && top.color!==card.color)){
+                  ciTop=top?order.indexOf(top.rank):-1;
+            if((!top&&card.rank==='K')||
+               (top&&ciTop===ciCard+1&&top.color!==card.color)){
               dest.push(card);
               if(selected.type==='waste') waste.pop();
               else tableau[selected.pi].pop();
