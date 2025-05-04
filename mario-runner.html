@@ -6,22 +6,19 @@
   <title>Zentroll Mario Runner</title>
   <style>
     body {
-      margin: 0; padding: 0;
-      display: flex; justify-content: center;
-      background: #0a1f3a;
+      margin:0; padding:0;
+      display:flex; justify-content:center;
+      background:#0a1f3a;
     }
     #game-container {
-      width: clamp(300px, 90vw, 600px);
-      position: relative;
+      width:clamp(300px,90vw,600px);
+      position:relative;
     }
     canvas {
-      width: 100%;
-      height: 200px;
-      background: #5c94fc; /* sky */
-      touch-action: none;  /* prevent scroll on mobile */
-      display: block;
-      border: 2px solid #333;
-      border-radius: 8px;
+      width:100%; height:200px;
+      background:#5c94fc; touch-action:none;
+      border:2px solid #333; border-radius:8px;
+      display:block;
     }
   </style>
 </head>
@@ -30,13 +27,11 @@
     <canvas id="game"></canvas>
   </div>
   <script>
-  (()=>{
+  (function(){
     const canvas = document.getElementById('game'),
           ctx    = canvas.getContext('2d'),
-          W      = 600,
-          H      = 200;
-    canvas.width  = W;
-    canvas.height = H;
+          W      = 600, H = 200;
+    canvas.width = W; canvas.height = H;
 
     const sprite = new Image();
     sprite.src   = 'https://greenworldai.github.io/freegames/assets/mario-sprite.png';
@@ -44,7 +39,7 @@
     const MARIO_W = 64, MARIO_H = 64, START_X = 50;
     let marioY, vy, onGround, gameOver, obstacles, spawnTimer, obstacleSpeed, loopId;
 
-    function resetState() {
+    function resetState(){
       marioY        = H - MARIO_H - 10;
       vy            = 0;
       onGround      = true;
@@ -52,110 +47,106 @@
       obstacles     = [];
       spawnTimer    = 0;
       obstacleSpeed = 4;
+      console.log('Game reset');
     }
 
-    function resetGame() {
-      resetState();
-      cancelAnimationFrame(loopId);
-      loop();
-    }
-
-    function doJump() {
-      if (!gameOver && onGround) {
+    function doJump(){
+      if(!gameOver && onGround){
         vy = -8;
         onGround = false;
+        console.log('Jump');
       }
     }
 
-    // Combine jump or restart on click/tap
-    canvas.addEventListener('mousedown', () => {
-      gameOver ? resetGame() : doJump();
-    });
-    canvas.addEventListener('touchstart', e => {
+    function onPointerDown(e){
       e.preventDefault();
-      gameOver ? resetGame() : doJump();
-    });
-    window.addEventListener('keydown', e => {
-      if ((e.code === 'Space' || e.code === 'ArrowUp')) {
-        gameOver ? resetGame() : doJump();
+      if(gameOver){
+        resetState();
+        loop();
+      } else {
+        doJump();
       }
+    }
+
+    // handle both mouse & touch
+    canvas.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('keydown', e=>{
+      if(e.code==='Space' || e.code==='ArrowUp') onPointerDown(e);
     });
 
-    function update() {
-      if (gameOver) return;
+    function update(){
+      if(gameOver) return;
+      // gravity
       vy += 0.5;
       marioY += vy;
-      if (marioY > H - MARIO_H - 10) {
-        marioY   = H - MARIO_H - 10;
-        vy       = 0;
+      if(marioY > H - MARIO_H - 10){
+        marioY = H - MARIO_H - 10;
+        vy = 0;
         onGround = true;
       }
-
+      // spawn
       spawnTimer++;
-      if (spawnTimer > 90 + Math.random()*60) {
-        obstacles.push({
-          x: W,
-          w: 20 + Math.random()*10,
-          h: 20 + Math.random()*20
-        });
+      if(spawnTimer > 90 + Math.random()*60){
+        obstacles.push({ x:W, w:20+Math.random()*10, h:20+Math.random()*20 });
         spawnTimer = 0;
       }
-
+      // speed up slightly
       obstacleSpeed += 0.001;
-      for (let i = obstacles.length - 1; i >= 0; i--) {
+      // move & cull
+      for(let i=obstacles.length-1;i>=0;i--){
         obstacles[i].x -= obstacleSpeed;
-        if (obstacles[i].x + obstacles[i].w < 0) {
-          obstacles.splice(i,1);
-        }
+        if(obstacles[i].x + obstacles[i].w < 0) obstacles.splice(i,1);
       }
-
+      // collision
       const marioB = marioY + MARIO_H;
-      for (const o of obstacles) {
+      for(const o of obstacles){
         const obsT = H - 10 - o.h;
-        if (
-          START_X < o.x + o.w &&
-          START_X + MARIO_W > o.x &&
-          marioB > obsT
-        ) {
+        if( START_X < o.x+o.w &&
+            START_X+MARIO_W > o.x &&
+            marioB > obsT ){
           gameOver = true;
+          console.log('Collision! Game Over');
+          cancelAnimationFrame(loopId);
           break;
         }
       }
     }
 
-    function draw() {
+    function draw(){
       ctx.clearRect(0,0,W,H);
-      ctx.fillStyle = '#654321';
-      ctx.fillRect(0, H - 10, W, 10);
-
+      // ground
+      ctx.fillStyle='#654321';
+      ctx.fillRect(0,H-10,W,10);
+      // mario
       ctx.drawImage(sprite,
-        0,0, sprite.width, sprite.height,
-        START_X, marioY, MARIO_W, MARIO_H
+        0,0, sprite.width,sprite.height,
+        START_X,marioY, MARIO_W,MARIO_H
       );
-
-      ctx.fillStyle = '#0a0';
-      for (const o of obstacles) {
-        ctx.fillRect(o.x, H - 10 - o.h, o.w, o.h);
+      // obstacles
+      ctx.fillStyle='#0a0';
+      for(const o of obstacles){
+        ctx.fillRect(o.x, H-10-o.h, o.w, o.h);
       }
-
-      if (gameOver) {
-        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      // overlay
+      if(gameOver){
+        ctx.fillStyle='rgba(0,0,0,0.5)';
         ctx.fillRect(0,0,W,H);
-        ctx.fillStyle = '#f00';
-        ctx.font = '30px sans-serif';
-        ctx.fillText('Game Over - Click to Restart', W/2 - 160, H/2);
+        ctx.fillStyle='#f00';
+        ctx.font='20px sans-serif';
+        ctx.fillText('Game Over — Tap or Space to Restart', 10, H/2);
       }
     }
 
-    function loop() {
+    function loop(){
       update();
       draw();
-      if (!gameOver) loopId = requestAnimationFrame(loop);
+      if(!gameOver) loopId = requestAnimationFrame(loop);
     }
 
+    // start
     resetState();
-    sprite.onload  = () => loop();
-    sprite.onerror = () => loop();
+    sprite.onload  = ()=>loop();
+    sprite.onerror = ()=>loop();
   })();
   </script>
 </body>
