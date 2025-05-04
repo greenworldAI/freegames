@@ -1,474 +1,289 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solitaire - Zentroll</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #2e7d32;
-            margin: 0;
-            padding: 10px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            color: white;
-            min-height: 100vh;
-            box-sizing: border-box;
-        }
-        #test-element {
-            font-size: 24px;
-            color: yellow;
-            margin-bottom: 20px;
-            display: block !important;
-            visibility: visible !important;
-        }
-        #solitaire-game-container {
-            max-width: 100%;
-            width: 800px;
-            display: block !important;
-            visibility: visible !important;
-            box-sizing: border-box;
-        }
-        .solitaire-pile {
-            display: inline-block;
-            width: 13%;
-            min-width: 60px;
-            min-height: 140px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 5px;
-            margin: 5px;
-            position: relative;
-            vertical-align: top;
-            box-sizing: border-box;
-        }
-        .solitaire-card {
-            width: 100%;
-            padding-top: 140%;
-            background: white;
-            border: 1px solid #000;
-            border-radius: 5px;
-            position: absolute;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-            display: block !important;
-            visibility: visible !important;
-            pointer-events: auto !important;
-            z-index: 10;
-            box-sizing: border-box;
-        }
-        .solitaire-card-content {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            font-size: 20px;
-            font-weight: bold;
-            color: inherit;
-            display: block !important;
-            visibility: visible !important;
-            z-index: 20;
-            pointer-events: none;
-        }
-        .solitaire-card.red { color: red; }
-        .solitaire-card.black { color: black; }
-        .solitaire-card.face-down {
-            background: linear-gradient(45deg, #0000FF, #1e90ff);
-            background-size: cover;
-            pointer-events: none;
-        }
-        .solitaire-card.selected {
-            border: 2px solid yellow !important;
-            z-index: 15;
-        }
-        .solitaire-stock, .solitaire-waste, .solitaire-foundation {
-            width: 13%;
-            min-width: 60px;
-            min-height: 140px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 5px;
-            margin: 5px;
-            display: inline-block;
-            vertical-align: top;
-            box-sizing: border-box;
-            pointer-events: auto !important;
-        }
-        #solitaire-top-row, #solitaire-tableau {
-            display: flex;
-            justify-content: space-between;
-            flex-wrap: nowrap;
-            width: 100%;
-        }
-        button {
-            padding: 8px 16px;
-            font-size: 14px;
-            margin: 10px;
-            background: #1976d2;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            pointer-events: auto !important;
-            display: inline-block !important;
-            z-index: 30;
-        }
-        @media (max-width: 600px) {
-            #solitaire-game-container {
-                width: 100%;
-            }
-            .solitaire-pile, .solitaire-stock, .solitaire-waste, .solitaire-foundation {
-                width: 15%;
-                min-width: 50px;
-                min-height: 100px;
-            }
-            .solitaire-card-content {
-                font-size: 16px;
-            }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Free Solitaire – Zentroll</title>
+  <style>
+    /* Container: min 200px, fluid up to 90vw, max 300px */
+    #sol-container {
+      width: clamp(200px, 90vw, 300px);
+      margin: 20px auto;
+      font-family: sans-serif;
+    }
+    #sol-top {
+      display: flex;
+      gap: 8px;
+    }
+    #sol-tableau {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .slot, .pile {
+      flex: 1;
+      position: relative;
+      aspect-ratio: 5/7;
+      background: #121212;
+      border: 2px solid #333;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .card {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      aspect-ratio: 5/7;
+      border: 1px solid #444;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      user-select: none;
+      cursor: pointer;
+      font-size: 1em;
+    }
+    .card.back {
+      background: #333;
+    }
+    .card.face {
+      background: #fff;
+    }
+  </style>
 </head>
 <body>
-    <div id="test-element">TEST ELEMENT - SHOULD BE VISIBLE</div>
-    <h1>Solitaire</h1>
-    <button id="new-game-btn">New Game</button>
-    <button id="redraw-btn">Redraw</button>
-    <button id="debug-btn">Debug DOM</button>
-    <div id="solitaire-game-container">
-        <div id="solitaire-top-row">
-            <div class="solitaire-stock" id="solitaire-stock"></div>
-            <div class="solitaire-waste" id="solitaire-waste"></div>
-            <div class="solitaire-foundation" id="solitaire-foundation-0"></div>
-            <div class="solitaire-foundation" id="solitaire-foundation-1"></div>
-            <div class="solitaire-foundation" id="solitaire-foundation-2"></div>
-            <div class="solitaire-foundation" id="solitaire-foundation-3"></div>
-        </div>
-        <div id="solitaire-tableau">
-            <div class="solitaire-pile" id="solitaire-pile-0"></div>
-            <div class="solitaire-pile" id="solitaire-pile-1"></div>
-            <div class="solitaire-pile" id="solitaire-pile-2"></div>
-            <div class="solitaire-pile" id="solitaire-pile-3"></div>
-            <div class="solitaire-pile" id="solitaire-pile-4"></div>
-            <div class="solitaire-pile" id="solitaire-pile-5"></div>
-            <div class="solitaire-pile" id="solitaire-pile-6"></div>
-        </div>
+  <div id="sol-container">
+    <div id="sol-top">
+      <div id="stock" class="slot"></div>
+      <div id="waste" class="slot"></div>
+      <div class="slot foundation" data-suit="♠"></div>
+      <div class="slot foundation" data-suit="♥"></div>
+      <div class="slot foundation" data-suit="♦"></div>
+      <div class="slot foundation" data-suit="♣"></div>
     </div>
+    <div id="sol-tableau">
+      <div class="pile" data-index="0"></div>
+      <div class="pile" data-index="1"></div>
+      <div class="pile" data-index="2"></div>
+      <div class="pile" data-index="3"></div>
+      <div class="pile" data-index="4"></div>
+      <div class="pile" data-index="5"></div>
+      <div class="pile" data-index="6"></div>
+    </div>
+  </div>
 
-    <script>
-        const suits = ['Spades', 'Clubs', 'Hearts', 'Diamonds'];
-        const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-        let deck = [];
-        let stock = [];
-        let waste = [];
-        let tableau = [[], [], [], [], [], [], []];
-        let foundations = [[], [], [], []];
-        let selectedCard = null;
-        let sourcePile = null;
+  <script>
+  (() => {
+    const suits = ['♠','♥','♦','♣'],
+          ranks = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'],
+          order = 'A23456789TJQK';
 
-        function createDeck() {
-            deck = [];
-            for (let suit of suits) {
-                for (let rank of ranks) {
-                    deck.push({ suit, rank, faceUp: false });
-                }
-            }
-            shuffle(deck);
-            console.log('Deck created:', deck.length, 'cards');
+    let stock = [], waste = [],
+        foundations = {'♠':[], '♥':[], '♦':[], '♣':[]},
+        tableau = [[],[],[],[],[],[],[]],
+        selected = null;
+
+    const stockEl = document.getElementById('stock'),
+          wasteEl = document.getElementById('waste');
+
+    function createDeck() {
+      const deck = [];
+      for (let s of suits) {
+        for (let r of ranks) {
+          deck.push({
+            suit: s,
+            rank: r,
+            color: (s==='♥'||s==='♦') ? 'red' : 'black',
+            faceUp: false
+          });
         }
+      }
+      return deck;
+    }
 
-        function shuffle(array) {
-            for (let i = array.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[j], array[i]];
-            }
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+    }
+
+    function handleStock() {
+      if (stock.length) {
+        const c = stock.pop();
+        c.faceUp = true;
+        waste.push(c);
+      } else {
+        while (waste.length) {
+          const c = waste.pop();
+          c.faceUp = false;
+          stock.push(c);
         }
+      }
+      selected = null;
+      render();
+    }
 
-        function deal() {
-            stock = [...deck];
-            tableau = [[], [], [], [], [], [], []];
-            foundations = [[], [], [], []];
-            waste = [];
-            for (let i = 0; i < 7; i++) {
-                for (let j = i; j < 7; j++) {
-                    const card = stock.pop();
-                    card.faceUp = (j === i);
-                    tableau[j].push(card);
-                }
-            }
-            // Ensure testable moves: Place A Clubs in tableau for foundation move
-            tableau[0] = [{ suit: 'Clubs', rank: 'A', faceUp: true }];
-            console.log('Dealt tableau:', tableau);
-            render();
+    function init() {
+      stock = []; waste = [];
+      foundations = {'♠':[], '♥':[], '♦':[], '♣':[]};
+      tableau = [[],[],[],[],[],[],[]];
+      selected = null;
+
+      const deck = createDeck();
+      shuffle(deck);
+
+      let idx = 0;
+      // deal tableau
+      for (let i = 0; i < 7; i++) {
+        for (let j = 0; j <= i; j++) {
+          const card = deck[idx++];
+          card.faceUp = (j === i);
+          tableau[i].push(card);
         }
+      }
+      // rest to stock
+      while (idx < deck.length) {
+        const card = deck[idx++];
+        card.faceUp = false;
+        stock.push(card);
+      }
 
-        function render() {
-            console.log('Rendering tableau:', tableau);
-            const container = document.getElementById('solitaire-game-container');
-            if (!container) {
-                console.error('Game container not found');
-                return;
-            }
-            const stockEl = document.getElementById('solitaire-stock');
-            if (stockEl) {
-                stockEl.innerHTML = stock.length ? '<div class="solitaire-card face-down"></div>' : '';
-            } else {
-                console.error('Stock element not found');
-            }
-            const wasteEl = document.getElementById('solitaire-waste');
-            if (wasteEl) {
-                wasteEl.innerHTML = waste.length ? createCardElement(waste[waste.length - 1]).outerHTML : '';
-            } else {
-                console.error('Waste element not found');
-            }
-            for (let i = 0; i < 7; i++) {
-                const pileEl = document.getElementById(`solitaire-pile-${i}`);
-                if (pileEl) {
-                    pileEl.innerHTML = '';
-                    tableau[i].forEach((card, index) => {
-                        const cardEl = createCardElement(card);
-                        cardEl.style.top = `${index * 25}px`;
-                        pileEl.appendChild(cardEl);
-                    });
-                    console.log(`Rendered pile ${i}: ${tableau[i].length} cards`);
-                } else {
-                    console.error(`Pile ${i} element not found`);
-                }
-            }
-            for (let i = 0; i < 4; i++) {
-                const foundationEl = document.getElementById(`solitaire-foundation-${i}`);
-                if (foundationEl) {
-                    foundationEl.innerHTML = foundations[i].length ? createCardElement(foundations[i][foundations[i].length - 1]).outerHTML : '';
-                } else {
-                    console.error(`Foundation ${i} element not found`);
-                }
-            }
-            reattachListeners();
+      render();
+    }
+
+    function render() {
+      // clear everything
+      stockEl.innerHTML = '';
+      wasteEl.innerHTML = '';
+      document.querySelectorAll('.foundation, .pile').forEach(el => el.innerHTML = '');
+
+      // STOCK
+      if (stock.length) {
+        const back = document.createElement('div');
+        back.className = 'card back';
+        back.style.top = '0';
+        back.addEventListener('click', handleStock);
+        stockEl.appendChild(back);
+      }
+      stockEl.onclick = handleStock;
+
+      // WASTE
+      if (waste.length) {
+        const top = waste[waste.length - 1];
+        const cardEl = document.createElement('div');
+        cardEl.className = 'card face';
+        cardEl.textContent = top.rank + top.suit;
+        cardEl.style.top   = '0';
+        cardEl.style.color = top.color === 'red' ? '#d00' : '#000';
+        wasteEl.appendChild(cardEl);
+      }
+      wasteEl.onclick = () => {
+        if (!waste.length) return;
+        selected = { type: 'waste' };
+        highlight();
+      };
+
+      // FOUNDATIONS
+      document.querySelectorAll('.foundation').forEach(el => {
+        const suit = el.dataset.suit || '';
+        const pile = foundations[suit] || [];
+        if (pile.length) {
+          const top = pile[pile.length - 1];
+          const cardEl = document.createElement('div');
+          cardEl.className = 'card face';
+          cardEl.textContent = top.rank + top.suit;
+          cardEl.style.top   = '0';
+          cardEl.style.color = top.color === 'red' ? '#d00' : '#000';
+          el.appendChild(cardEl);
         }
+        el.onclick = () => {
+          if (!selected) return;
+          const dest = foundations[suit] || [];
+          let card;
+          if (selected.type === 'waste') {
+            card = waste[waste.length - 1];
+          } else {
+            const { pi, ci } = selected;
+            if (ci !== tableau[pi].length - 1) return;
+            card = tableau[pi][ci];
+          }
+          if (card && card.suit === suit && order.indexOf(card.rank) === dest.length) {
+            dest.push(card);
+            if (selected.type === 'waste') waste.pop();
+            else tableau[selected.pi].pop();
+          }
+          selected = null;
+          render();
+        };
+      });
 
-        function createCardElement(card) {
-            const cardEl = document.createElement('div');
-            cardEl.className = `solitaire-card ${card.faceUp ? (['Hearts', 'Diamonds'].includes(card.suit) ? 'red' : 'black') : 'face-down'}`;
-            cardEl.dataset.suit = card.suit;
-            cardEl.dataset.rank = card.rank;
-            if (card.faceUp) {
-                const contentEl = document.createElement('div');
-                contentEl.className = 'solitaire-card-content';
-                contentEl.textContent = `${card.rank} ${card.suit}`;
-                cardEl.appendChild(contentEl);
-            }
-            console.log(`Created card: ${card.rank} ${card.suit}, faceUp: ${card.faceUp}`);
-            return cardEl;
-        }
-
-        function selectCard(event) {
-            console.log('Card click event:', event.target);
-            const cardEl = event.target.closest('.solitaire-card');
-            if (!cardEl || cardEl.classList.contains('face-down')) {
-                console.log('Ignored click on invalid or face-down card');
-                return;
-            }
-            console.log('Click detected on:', cardEl.dataset.rank, cardEl.dataset.suit);
-            if (selectedCard) {
-                const targetPile = findTargetPile(event.target);
-                if (targetPile && selectedCard !== cardEl) {
-                    const card = { suit: selectedCard.dataset.suit, rank: selectedCard.dataset.rank, faceUp: true };
-                    if (isValidMove([card], targetPile)) {
-                        moveCards([card], sourcePile, targetPile);
-                        checkWin();
-                    } else {
-                        console.log('Invalid move attempted:', card.rank, card.suit, 'to', targetPile.type, targetPile.index);
-                    }
-                }
-                selectedCard.classList.remove('selected');
-                if (selectedCard === cardEl) {
-                    selectedCard = null;
-                    sourcePile = null;
-                    console.log('Deselected card');
-                    return;
-                }
-            }
-            selectedCard = cardEl;
-            sourcePile = findSourcePile(cardEl);
-            if (!sourcePile) {
-                console.error('Source pile not found for card:', cardEl.dataset.rank, cardEl.dataset.suit);
-                selectedCard = null;
-                return;
-            }
-            cardEl.classList.add('selected');
-            console.log(`Selected card: ${cardEl.dataset.rank} ${cardEl.dataset.suit}, source: ${sourcePile.type}${sourcePile.index !== undefined ? '-' + sourcePile.index : ''}`);
-            render();
-        }
-
-        function findSourcePile(cardEl) {
-            const parent = cardEl.closest('.solitaire-pile, .solitaire-waste, .solitaire-foundation');
-            if (!parent) {
-                console.error('No parent pile found for card:', cardEl.dataset.rank, cardEl.dataset.suit);
-                return null;
-            }
-            if (parent.id === 'solitaire-waste') return { type: 'waste' };
-            for (let i = 0; i < 7; i++) {
-                if (parent.id === `solitaire-pile-${i}`) return { type: 'tableau', index: i };
-            }
-            for (let i = 0; i < 4; i++) {
-                if (parent.id === `solitaire-foundation-${i}`) return { type: 'foundation', index: i };
-            }
-            console.error('Unknown parent pile:', parent.id);
-            return null;
-        }
-
-        function findTargetPile(target) {
-            const pileEl = target.closest('.solitaire-pile, .solitaire-foundation');
-            if (!pileEl) {
-                console.log('No target pile found');
-                return null;
-            }
-            if (pileEl.classList.contains('solitaire-pile')) {
-                const index = parseInt(pileEl.id.split('-')[2]);
-                return { type: 'tableau', index };
-            }
-            if (pileEl.classList.contains('solitaire-foundation')) {
-                const index = parseInt(pileEl.id.split('-')[2]);
-                return { type: 'foundation', index };
-            }
-            console.log('Unknown target pile:', pileEl.id);
-            return null;
-        }
-
-        function isValidMove(cards, targetPile) {
-            const topCard = cards[0];
-            console.log('Checking move:', topCard.rank, topCard.suit, 'to', targetPile.type, targetPile.index);
-            if (targetPile.type === 'foundation') {
-                const foundation = foundations[targetPile.index];
-                if (foundation.length === 0) {
-                    console.log('Foundation empty, checking for Ace:', topCard.rank === 'A');
-                    return topCard.rank === 'A';
-                }
-                const topFoundationCard = foundation[foundation.length - 1];
-                const isValidSuit = topCard.suit === topFoundationCard.suit;
-                const isValidRank = ranks.indexOf(topCard.rank) === ranks.indexOf(topFoundationCard.rank) + 1;
-                console.log('Foundation move check:', { isValidSuit, isValidRank });
-                return isValidSuit && isValidRank;
-            }
-            if (targetPile.type === 'tableau') {
-                const pile = tableau[targetPile.index];
-                if (pile.length === 0) {
-                    console.log('Tableau empty, checking for King:', topCard.rank === 'K');
-                    return topCard.rank === 'K';
-                }
-                const topPileCard = pile[pile.length - 1];
-                const isRed = ['Hearts', 'Diamonds'].includes(topCard.suit);
-                const topIsRed = ['Hearts', 'Diamonds'].includes(topPileCard.suit);
-                const isValidColor = isRed !== topIsRed;
-                const isValidRank = ranks.indexOf(topCard.rank) === ranks.indexOf(topPileCard.rank) - 1;
-                console.log('Tableau move check:', { isValidColor, isValidRank });
-                return isValidColor && isValidRank;
-            }
-            console.log('Invalid target pile type');
-            return false;
-        }
-
-        function moveCards(cards, source, target) {
-            console.log('Moving card:', cards[0].rank, cards[0].suit, 'from', source.type, source.index, 'to', target.type, target.index);
-            if (source.type === 'waste') waste.pop();
-            else if (source.type === 'tableau') tableau[source.index].pop();
-            else if (source.type === 'foundation') foundations[source.index].pop();
-            if (target.type === 'tableau') {
-                tableau[target.index].push(cards[0]);
-                if (source.type === 'tableau' && tableau[source.index].length) {
-                    tableau[source.index][tableau[source.index].length - 1].faceUp = true;
-                }
-            } else if (target.type === 'foundation') {
-                foundations[target.index].push(cards[0]);
-            }
-            console.log(`Moved ${cards[0].rank} ${cards[0].suit} from ${source.type}${source.index !== undefined ? '-' + source.index : ''} to ${target.type}${target.index !== undefined ? '-' + target.index : ''}`);
-            selectedCard = null;
-            sourcePile = null;
-            render();
-        }
-
-        function drawCard(event) {
-            console.log('Stock clicked, event:', event.target);
-            if (stock.length) {
-                const card = stock.pop();
-                card.faceUp = true;
-                waste.push(card);
-                console.log('Drew card to waste:', card.rank, card.suit);
-            } else if (waste.length) {
-                stock = waste.reverse().map(card => ({ ...card, faceUp: false }));
-                waste = [];
-                console.log('Recycled waste to stock');
-            }
-            render();
-        }
-
-        function checkWin() {
-            if (foundations.every(f => f.length === 13)) alert('You won!');
-        }
-
-        function newGame() {
-            console.log('New Game clicked');
-            createDeck();
-            deal();
-        }
-
-        function debugDOM() {
-            console.log('Debug DOM clicked');
-            const container = document.getElementById('solitaire-game-container');
-            console.log('DOM Debug: Container exists?', !!container);
-            if (container) {
-                console.log('Tableau HTML:', document.getElementById('solitaire-tableau').innerHTML);
-                console.log('Top Row HTML:', document.getElementById('solitaire-top-row').innerHTML);
-            }
-        }
-
-        function reattachListeners() {
-            document.querySelectorAll('.solitaire-card:not(.face-down)').forEach(card => {
-                card.removeEventListener('click', selectCard);
-                card.addEventListener('click', selectCard);
-            });
-            const stockEl = document.getElementById('solitaire-stock');
-            if (stockEl) {
-                stockEl.removeEventListener('click', drawCard);
-                stockEl.addEventListener('click', drawCard);
-                console.log('Stock listener reattached');
-            }
-            console.log('Reattached listeners for cards and stock');
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('DOM Loaded');
-            const stockEl = document.getElementById('solitaire-stock');
-            if (stockEl) {
-                stockEl.addEventListener('click', drawCard);
-                console.log('Stock listener attached');
-            } else {
-                console.error('Stock element not found on load');
-            }
-            const newGameBtn = document.getElementById('new-game-btn');
-            if (newGameBtn) {
-                newGameBtn.addEventListener('click', () => {
-                    console.log('New Game button clicked');
-                    newGame();
-                });
-                console.log('New Game listener attached');
-            }
-            const redrawBtn = document.getElementById('redraw-btn');
-            if (redrawBtn) {
-                redrawBtn.addEventListener('click', () => {
-                    console.log('Redraw button clicked');
-                    render();
-                });
-                console.log('Redraw listener attached');
-            }
-            const debugBtn = document.getElementById('debug-btn');
-            if (debugBtn) {
-                debugBtn.addEventListener('click', () => {
-                    console.log('Debug DOM button clicked');
-                    debugDOM();
-                });
-                console.log('Debug DOM listener attached');
-            }
-            newGame();
-            setInterval(reattachListeners, 1000);
+      // TABLEAU
+      document.querySelectorAll('.pile').forEach(el => {
+        const idx = parseInt(el.dataset.index, 10);
+        const pileArr = tableau[idx] || [];
+        pileArr.forEach((card, ci) => {
+          const cardEl = document.createElement('div');
+          cardEl.className = 'card ' + (card.faceUp ? 'face' : 'back');
+          cardEl.style.top = (ci * 30) + 'px';
+          if (card.faceUp) {
+            cardEl.textContent = card.rank + card.suit;
+            cardEl.style.color = card.color === 'red' ? '#d00' : '#000';
+          }
+          cardEl.dataset.pile = 'tableau';
+          cardEl.dataset.pi   = idx;
+          cardEl.dataset.ci   = ci;
+          el.appendChild(cardEl);
         });
-    </script>
+
+        el.onclick = e => {
+          const t = e.target;
+          if (t.classList.contains('card') && t.classList.contains('face')) {
+            const pi2 = +t.dataset.pi, ci2 = +t.dataset.ci;
+            if (ci2 === tableau[pi2].length - 1) {
+              selected = { type: 'tableau', pi: pi2, ci: ci2 };
+              highlight();
+            }
+          } else if (selected) {
+            const dest = tableau[idx] || [];
+            let card;
+            if (selected.type === 'waste') {
+              card = waste[waste.length - 1];
+            } else {
+              card = tableau[selected.pi][selected.ci];
+            }
+            const top = dest[dest.length - 1];
+            const ciCard = order.indexOf(card.rank);
+            const ciTop  = top ? order.indexOf(top.rank) : -1;
+            if ((!top && card.rank === 'K') ||
+                (top && ciTop === ciCard + 1 && top.color !== card.color)) {
+              dest.push(card);
+              if (selected.type === 'waste') waste.pop();
+              else tableau[selected.pi].pop();
+            }
+            selected = null;
+            render();
+          }
+        };
+      });
+    }
+
+    function highlight() {
+      document.querySelectorAll('.card').forEach(c => c.style.outline = '');
+      if (!selected) return;
+      let selEl;
+      if (selected.type === 'waste') {
+        selEl = wasteEl.querySelector('.card.face');
+      } else {
+        selEl = document.querySelector(`.pile[data-index="${selected.pi}"] .card[data-ci="${selected.ci}"]`);
+      }
+      if (selEl) selEl.style.outline = '3px solid yellow';
+    }
+
+    // kick off
+    init();
+  })();
+  </script>
 </body>
 </html>
