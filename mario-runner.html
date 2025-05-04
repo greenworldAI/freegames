@@ -6,16 +6,14 @@
   <title>Zentroll Mario Runner</title>
   <style>
     body {
-      margin: 0;
-      padding: 0;
-      display: flex;
-      justify-content: center;
+      margin: 0; padding: 0;
+      display: flex; justify-content: center;
       background: #0a1f3a;
     }
     canvas {
       width: clamp(300px, 90vw, 600px);
       height: 200px;
-      background: #5c94fc; /* sky blue */
+      background: #5c94fc; /* sky */
       display: block;
     }
   </style>
@@ -23,25 +21,29 @@
 <body>
   <canvas id="game"></canvas>
   <script>
-  (() => {
+  (()=>{
     const canvas = document.getElementById('game');
     const ctx    = canvas.getContext('2d');
     const W = 600, H = 200;
     canvas.width  = W;
     canvas.height = H;
 
-    // ← Absolute URL to your uploaded sprite
+    // load your sprite
     const sprite = new Image();
+    // use absolute URL so iframe can't confuse paths
     sprite.src = 'https://greenworldai.github.io/freegames/assets/mario-sprite.png';
 
+    // Mario size & physics
     const MARIO_W = 64, MARIO_H = 64;
     let marioY   = H - MARIO_H - 10,
         vy       = 0,
         onGround = true;
 
+    // obstacles
     const obstacles = [];
     let spawnTimer = 0;
 
+    // jump on Space or ↑
     window.addEventListener('keydown', e => {
       if ((e.code === 'Space' || e.code === 'ArrowUp') && onGround) {
         vy = -8;
@@ -50,6 +52,7 @@
     });
 
     function update() {
+      // gravity
       vy += 0.5;
       marioY += vy;
       if (marioY > H - MARIO_H - 10) {
@@ -58,23 +61,26 @@
         onGround = true;
       }
 
+      // spawn
       spawnTimer++;
-      if (spawnTimer > 90 + Math.random() * 60) {
+      if (spawnTimer > 90 + Math.random()*60) {
         obstacles.push({
           x: W,
-          w: 20 + Math.random() * 10,
-          h: 20 + Math.random() * 20
+          w: 20 + Math.random()*10,
+          h: 20 + Math.random()*20
         });
         spawnTimer = 0;
       }
 
+      // move & cull
       for (let i = obstacles.length - 1; i >= 0; i--) {
         obstacles[i].x -= 4;
         if (obstacles[i].x + obstacles[i].w < 0) {
-          obstacles.splice(i, 1);
+          obstacles.splice(i,1);
         }
       }
 
+      // collision
       for (let o of obstacles) {
         if (
           o.x < 50 + MARIO_W &&
@@ -83,7 +89,7 @@
         ) {
           cancelAnimationFrame(loopId);
           ctx.fillStyle = 'rgba(0,0,0,0.5)';
-          ctx.fillRect(0, 0, W, H);
+          ctx.fillRect(0,0,W,H);
           ctx.fillStyle = '#f00';
           ctx.font = '30px sans-serif';
           ctx.fillText('Game Over', W/2 - 80, H/2);
@@ -92,18 +98,17 @@
     }
 
     function draw() {
-      ctx.clearRect(0, 0, W, H);
-
+      ctx.clearRect(0,0,W,H);
+      // ground
       ctx.fillStyle = '#654321';
-      ctx.fillRect(0, H - 10, W, 10);
-
-      // draw your sprite
+      ctx.fillRect(0, H-10, W, 10);
+      // Mario
       ctx.drawImage(
         sprite,
-        0, 0, sprite.width, sprite.height,
+        0,0, sprite.width, sprite.height,
         50, marioY, MARIO_W, MARIO_H
       );
-
+      // obstacles
       ctx.fillStyle = '#0a0';
       for (let o of obstacles) {
         ctx.fillRect(o.x, H - 10 - o.h, o.w, o.h);
@@ -117,10 +122,13 @@
       loopId = requestAnimationFrame(loop);
     }
 
+    // Kick off the loop *once* the sprite URL is set.
+    sprite.onload = () => loop();
     sprite.onerror = () => {
-      console.error('Failed to load sprite. Check the URL: ', sprite.src);
+      console.error('Could not load sprite:', sprite.src);
+      // still start game so you can debug
+      loop();
     };
-    sprite.onload  = () => loop();
   })();
   </script>
 </body>
