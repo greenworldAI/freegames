@@ -5,7 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Zentroll Mario Runner</title>
   <style>
-    body { margin:0; display:flex; justify-content:center; background:#0a1f3a; }
+    body {
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      background: #0a1f3a;
+    }
     canvas {
       width: clamp(300px, 90vw, 600px);
       height: 200px;
@@ -25,7 +31,7 @@
     canvas.width  = W;
     canvas.height = H;
 
-    // load sprite sheet
+    // load sprite sheet (must be at assets/mario-sprite.png)
     const sprite = new Image();
     sprite.src = 'assets/mario-sprite.png';
 
@@ -73,37 +79,46 @@
       // spawn obstacles
       spawnTimer++;
       if (spawnTimer > 90 + Math.random() * 60) {
-        obstacles.push({ x: W, w: 20 + Math.random()*10, h: 20 + Math.random()*20 });
+        obstacles.push({
+          x: W,
+          w: 20 + Math.random() * 10,
+          h: 20 + Math.random() * 20
+        });
         spawnTimer = 0;
       }
       // move and cull obstacles
       for (let i = obstacles.length - 1; i >= 0; i--) {
         obstacles[i].x -= 4;
-        if (obstacles[i].x + obstacles[i].w < 0) obstacles.splice(i,1);
+        if (obstacles[i].x + obstacles[i].w < 0) {
+          obstacles.splice(i, 1);
+        }
       }
 
       // collision?
       for (let o of obstacles) {
-        if (o.x < 50+MARIO_W && o.x+o.w > 50 &&
-            marioY+MARIO_H > H - 10 - o.h) {
+        if (
+          o.x < 50 + MARIO_W &&
+          o.x + o.w > 50 &&
+          marioY + MARIO_H > H - 10 - o.h
+        ) {
           // game over
           cancelAnimationFrame(loopId);
           ctx.fillStyle = 'rgba(0,0,0,0.5)';
-          ctx.fillRect(0,0,W,H);
+          ctx.fillRect(0, 0, W, H);
           ctx.fillStyle = '#f00';
           ctx.font = '30px sans-serif';
-          ctx.fillText('Game Over', W/2 - 80, H/2);
+          ctx.fillText('Game Over', W / 2 - 80, H / 2);
         }
       }
     }
 
     function draw() {
       // clear
-      ctx.clearRect(0,0,W,H);
+      ctx.clearRect(0, 0, W, H);
 
       // ground
       ctx.fillStyle = '#654321';
-      ctx.fillRect(0, H-10, W, 10);
+      ctx.fillRect(0, H - 10, W, 10);
 
       // draw Mario frame
       ctx.drawImage(
