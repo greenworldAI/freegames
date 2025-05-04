@@ -6,14 +6,13 @@
   <title>Zentroll Mario Runner</title>
   <style>
     body {
-      margin: 0; padding: 0;
-      display: flex;
-      justify-content: center;
+      margin: 0; padding: 20px;
+      display: flex; flex-direction: column;
+      align-items: center;
       background: #0a1f3a;
       font-family: sans-serif;
     }
     #game-container {
-      position: relative;
       width: clamp(300px, 90vw, 600px);
     }
     canvas {
@@ -21,31 +20,28 @@
       height: 200px;
       background: #5c94fc;
       touch-action: none;
-      display: block;
       border: 2px solid #333;
       border-radius: 8px;
+      display: block;
     }
     #restart {
-      position: absolute;
-      bottom: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 6px 12px;
+      margin-top: 12px;
+      padding: 8px 16px;
       background: #fff;
       color: #000;
       border: none;
       border-radius: 4px;
       cursor: pointer;
-      font-size: 14px;
-      z-index: 5;
+      font-size: 16px;
     }
   </style>
 </head>
 <body>
   <div id="game-container">
     <canvas id="game"></canvas>
-    <button id="restart">Restart</button>
   </div>
+  <button id="restart">Restart</button>
+
   <script>
   (()=>{
     const c = document.getElementById('game'),
@@ -91,27 +87,27 @@
 
     function update() {
       if (gameOver) return;
+      // gravity
       vy += 0.5;
       marioY += vy;
       if (marioY > H - MARIO_H - 10) {
         marioY = H - MARIO_H - 10;
-        vy = 0;
-        onGround = true;
+        vy = 0; onGround = true;
       }
+      // spawn
       spawnTimer++;
       if (spawnTimer > 90 + Math.random()*60) {
-        obstacles.push({
-          x: W,
-          w: 20 + Math.random()*10,
-          h: 20 + Math.random()*20
-        });
+        obstacles.push({ x: W, w: 20 + Math.random()*10, h: 20 + Math.random()*20 });
         spawnTimer = 0;
       }
+      // speed up
       obstacleSpeed += 0.001;
-      for (let i = obstacles.length - 1; i >= 0; i--) {
+      // move & cull
+      for (let i=obstacles.length-1; i>=0; i--) {
         obstacles[i].x -= obstacleSpeed;
         if (obstacles[i].x + obstacles[i].w < 0) obstacles.splice(i,1);
       }
+      // collision
       const marioB = marioY + MARIO_H;
       for (const o of obstacles) {
         const obsT = H - 10 - o.h;
@@ -128,14 +124,18 @@
 
     function draw() {
       ctx.clearRect(0,0,W,H);
+      // ground
       ctx.fillStyle = '#654321';
       ctx.fillRect(0, H-10, W, 10);
+      // Mario
       ctx.drawImage(sprite, 0,0, sprite.width, sprite.height,
                     START_X, marioY, MARIO_W, MARIO_H);
+      // obstacles
       ctx.fillStyle = '#0a0';
       for (const o of obstacles) {
         ctx.fillRect(o.x, H - 10 - o.h, o.w, o.h);
       }
+      // game over
       if (gameOver) {
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
         ctx.fillRect(0,0,W,H);
@@ -151,6 +151,7 @@
       if (!gameOver) loopId = requestAnimationFrame(loop);
     }
 
+    // kick off
     resetState();
     sprite.onload  = () => loop();
     sprite.onerror = () => loop();
