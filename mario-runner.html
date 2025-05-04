@@ -6,25 +6,44 @@
   <title>Zentroll Mario Runner</title>
   <style>
     body {
-      margin: 0;
-      padding: 0;
-      display: flex;
-      justify-content: center;
+      margin: 0; padding: 0;
+      display: flex; justify-content: center;
       background: #0a1f3a;
+      font-family: sans-serif;
+    }
+    #game-container {
+      position: relative;
+      width: clamp(300px, 90vw, 600px);
     }
     canvas {
-      width: clamp(300px, 90vw, 600px);
+      width: 100%;
       height: 200px;
       background: #5c94fc; /* sky */
       touch-action: none;  /* prevent scroll on mobile */
       display: block;
     }
+    #restart {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 6px 12px;
+      background: #fff;
+      color: #000;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      z-index: 10;
+    }
   </style>
 </head>
 <body>
-  <canvas id="game"></canvas>
+  <div id="game-container">
+    <button id="restart">Restart</button>
+    <canvas id="game"></canvas>
+  </div>
   <script>
-  (() => {
+  (()=>{
     const canvas = document.getElementById('game'),
           ctx    = canvas.getContext('2d'),
           W      = 600,
@@ -32,22 +51,33 @@
     canvas.width  = W;
     canvas.height = H;
 
-    // Absolute URL to your uploaded sprite
     const sprite = new Image();
     sprite.src   = 'https://greenworldai.github.io/freegames/assets/mario-sprite.png';
 
-    // Mario size & start position
-    const MARIO_W = 64, MARIO_H = 64, START_X = 50;
-    let marioY   = H - MARIO_H - 10,
-        vy       = 0,
-        onGround = true,
-        gameOver = false;
+    const MARIO_W  = 64, MARIO_H = 64, START_X = 50;
+    let marioY    = H - MARIO_H - 10,
+        vy        = 0,
+        onGround  = true,
+        gameOver  = false,
+        obstacles = [],
+        spawnTimer = 0,
+        obstacleSpeed = 4,
+        loopId;
 
-    // Obstacles
-    const obstacles = [];
-    let spawnTimer = 0;
+    function resetGame() {
+      gameOver = false;
+      marioY = H - MARIO_H - 10;
+      vy = 0;
+      onGround = true;
+      obstacles.length = 0;
+      spawnTimer = 0;
+      obstacleSpeed = 4;
+      cancelAnimationFrame(loopId);
+      loop();
+    }
 
-    // Handle jump (keyboard, click, touch)
+    document.getElementById('restart').addEventListener('click', resetGame);
+
     function doJump() {
       if (onGround && !gameOver) {
         vy = -8;
@@ -57,25 +87,25 @@
     window.addEventListener('keydown', e => {
       if (e.code === 'Space' || e.code === 'ArrowUp') doJump();
     });
-    canvas.addEventListener('mousedown',  doJump);
+    canvas.addEventListener('mousedown', doJump);
     canvas.addEventListener('touchstart', e => { e.preventDefault(); doJump(); });
 
-    // Update positions & game logic
     function update() {
       if (gameOver) return;
 
-      // Gravity & ground
+      // gravity & ground
       vy += 0.5;
       marioY += vy;
       if (marioY > H - MARIO_H - 10) {
-        marioY   = H - MARIO_H - 10;
-        vy       = 0;
+        marioY = H - MARIO_H - 10;
+        vy = 0;
         onGround = true;
       }
 
-      // Spawn obstacles
+      // spawn obstacles faster
       spawnTimer++;
-      if (spawnTimer > 90 + Math.random() * 60) {
+      const threshold = 60 + Math.random() * 30;
+      if (spawnTimer > threshold) {
         obstacles.push({
           x: W,
           w: 20 + Math.random() * 10,
@@ -84,15 +114,18 @@
         spawnTimer = 0;
       }
 
-      // Move and cull obstacles
+      // increase speed over time
+      obstacleSpeed += 0.0005;
+
+      // move & cull
       for (let i = obstacles.length - 1; i >= 0; i--) {
-        obstacles[i].x -= 4;
+        obstacles[i].x -= obstacleSpeed;
         if (obstacles[i].x + obstacles[i].w < 0) {
           obstacles.splice(i, 1);
         }
       }
 
-      // Collision detection
+      // collision
       const marioBottom = marioY + MARIO_H;
       for (const o of obstacles) {
         const obsTop = H - 10 - o.h;
@@ -107,46 +140,39 @@
       }
     }
 
-    // Draw everything
     function draw() {
       ctx.clearRect(0, 0, W, H);
-
-      // Ground
+      // ground
       ctx.fillStyle = '#654321';
       ctx.fillRect(0, H - 10, W, 10);
-
       // Mario
       ctx.drawImage(
         sprite,
         0, 0, sprite.width, sprite.height,
         START_X, marioY, MARIO_W, MARIO_H
       );
-
-      // Obstacles
+      // obstacles
       ctx.fillStyle = '#0a0';
       for (const o of obstacles) {
         ctx.fillRect(o.x, H - 10 - o.h, o.w, o.h);
       }
-
-      // Game Over overlay
+      // game over overlay
       if (gameOver) {
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
-        ctx.fillRect(0, 0, W, H);
+        ctx.fillRect(0,0,W,H);
         ctx.fillStyle = '#f00';
         ctx.font = '30px sans-serif';
         ctx.fillText('Game Over', W/2 - 80, H/2);
       }
     }
 
-    // Main loop
-    let loopId;
     function loop() {
       update();
       draw();
       if (!gameOver) loopId = requestAnimationFrame(loop);
     }
 
-    // Start immediately
+    // start
     loop();
   })();
   </script>
