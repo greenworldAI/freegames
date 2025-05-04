@@ -25,26 +25,29 @@
   (()=>{
     const canvas = document.getElementById('game'),
           ctx    = canvas.getContext('2d'),
-          W = 600, H = 200;
-    canvas.width = W; canvas.height = H;
+          W      = 600,
+          H      = 200;
+    canvas.width  = W;
+    canvas.height = H;
 
-    // load sprite
+    // load your uploaded sprite via absolute URL
     const sprite = new Image();
-    sprite.src = 'https://greenworldai.github.io/freegames/assets/mario-sprite.png';
+    sprite.src   = 'https://greenworldai.github.io/freegames/assets/mario-sprite.png';
 
-    // Mario constants
-    const MARIO_W = 64, MARIO_H = 64,
-          START_X = 50;
+    // Mario constants & state
+    const MARIO_W  = 64,
+          MARIO_H  = 64,
+          START_X  = 50;
     let marioY    = H - MARIO_H - 10,
         vy        = 0,
         onGround  = true,
         gameOver  = false;
 
-    // Obstacles
+    // Obstacles array & spawn timer
     const obstacles = [];
     let spawnTimer = 0;
 
-    // Jump handler
+    // Jump logic (keyboard, click, touch)
     function doJump() {
       if (onGround && !gameOver) {
         vy = -8;
@@ -54,25 +57,26 @@
     window.addEventListener('keydown', e => {
       if (e.code === 'Space' || e.code === 'ArrowUp') doJump();
     });
-    canvas.addEventListener('mousedown',  () => doJump());
+    canvas.addEventListener('mousedown',  doJump);
     canvas.addEventListener('touchstart', e => {
       e.preventDefault();
       doJump();
     });
 
+    // Update game state
     function update() {
       if (gameOver) return;
 
-      // Gravity & ground
+      // gravity + ground collision
       vy += 0.5;
       marioY += vy;
       if (marioY > H - MARIO_H - 10) {
-        marioY = H - MARIO_H - 10;
-        vy = 0;
+        marioY   = H - MARIO_H - 10;
+        vy       = 0;
         onGround = true;
       }
 
-      // Spawn obstacles
+      // spawn obstacles every ~1.5–2.5s
       spawnTimer++;
       if (spawnTimer > 90 + Math.random() * 60) {
         obstacles.push({
@@ -83,7 +87,7 @@
         spawnTimer = 0;
       }
 
-      // Move & cull obstacles
+      // move obstacles left, and remove off-screen
       for (let i = obstacles.length - 1; i >= 0; i--) {
         obstacles[i].x -= 4;
         if (obstacles[i].x + obstacles[i].w < 0) {
@@ -91,7 +95,7 @@
         }
       }
 
-      // Collision detection
+      // collision detection
       const marioBottom = marioY + MARIO_H;
       for (let o of obstacles) {
         const obsTop = H - 10 - o.h;
@@ -106,22 +110,22 @@
       }
     }
 
+    // Draw everything
     function draw() {
-      // Clear
       ctx.clearRect(0, 0, W, H);
 
-      // Ground
+      // ground
       ctx.fillStyle = '#654321';
       ctx.fillRect(0, H - 10, W, 10);
 
-      // Mario
+      // Mario sprite
       ctx.drawImage(
         sprite,
         0, 0, sprite.width, sprite.height,
         START_X, marioY, MARIO_W, MARIO_H
       );
 
-      // Obstacles
+      // obstacles
       ctx.fillStyle = '#0a0';
       for (let o of obstacles) {
         ctx.fillRect(o.x, H - 10 - o.h, o.w, o.h);
@@ -133,10 +137,11 @@
         ctx.fillRect(0, 0, W, H);
         ctx.fillStyle = '#f00';
         ctx.font = '30px sans-serif';
-        ctx.fillText('Game Over', W/2 - 80, H/2);
+        ctx.fillText('Game Over', W / 2 - 80, H / 2);
       }
     }
 
+    // Main loop
     let loopId;
     function loop() {
       update();
@@ -144,9 +149,12 @@
       if (!gameOver) loopId = requestAnimationFrame(loop);
     }
 
-    // Start immediately
-    loop();
-    sprite.onerror = () => console.error('Sprite failed to load:', sprite.src);
+    // Start the loop once the sprite is available (or even if it errors)
+    sprite.onload  = () => loop();
+    sprite.onerror = () => {
+      console.error('Failed to load sprite:', sprite.src);
+      loop();
+    };
   })();
   </script>
 </body>
