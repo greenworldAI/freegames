@@ -1,121 +1,160 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mario Runner</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background-color: #87ceeb;
-        }
-        canvas {
-            display: block;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Zentroll Mario Runner</title>
+  <style>
+    body {
+      margin: 0; padding: 0;
+      display: flex;
+      justify-content: center;
+      background: #0a1f3a;
+      font-family: sans-serif;
+    }
+    #game-container {
+      position: relative;
+      width: clamp(300px, 90vw, 600px);
+    }
+    canvas {
+      width: 100%;
+      height: 200px;
+      background: #5c94fc;
+      touch-action: none;
+      display: block;
+      border: 2px solid #333;
+      border-radius: 8px;
+    }
+    #restart {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 12px;
+      background: #fff;
+      color: #000;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      z-index: 5;
+    }
+  </style>
 </head>
 <body>
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
-    <script>
-        const config = {
-            type: Phaser.AUTO,
-            width: 800,
-            height: 600,
-            physics: {
-                default: 'arcade',
-                arcade: {
-                    gravity: { y: 300 },
-                    debug: false
-                }
-            },
-            scene: {
-                preload: preload,
-                create: create,
-                update: update
-            }
-        };
+  <div id="game-container">
+    <canvas id="game"></canvas>
+    <button id="restart">Restart</button>
+  </div>
+  <script>
+  (()=>{
+    const c = document.getElementById('game'),
+          ctx = c.getContext('2d'),
+          W = 600, H = 200;
+    c.width = W; c.height = H;
 
-        const game = new Phaser.Game(config);
+    const sprite = new Image();
+    sprite.src = 'https://greenworldai.github.io/freegames/assets/mario-sprite.png';
 
-        let player;
-        let platforms;
-        let cursors;
+    const MARIO_W = 64, MARIO_H = 64, START_X = 50;
+    let marioY, vy, onGround, gameOver, obstacles, spawnTimer, obstacleSpeed, loopId;
 
-        function preload() {
-            // Load placeholder assets from Phaser labs
-            this.load.image('sky', 'https://labs.phaser.io/assets/skies/sky4.png');
-            this.load.image('ground', 'https://labs.phaser.io/assets/sprites/platform.png');
-            this.load.spritesheet('dude', 
-                'https://labs.phaser.io/assets/sprites/dude.png',
-                { frameWidth: 32, frameHeight: 48 }
-            );
+    function resetState() {
+      marioY        = H - MARIO_H - 10;
+      vy            = 0;
+      onGround      = true;
+      gameOver      = false;
+      obstacles     = [];
+      spawnTimer    = 0;
+      obstacleSpeed = 4;
+    }
+
+    function resetGame() {
+      resetState();
+      cancelAnimationFrame(loopId);
+      loop();
+    }
+
+    document.getElementById('restart').addEventListener('click', resetGame);
+
+    function doJump() {
+      if (onGround && !gameOver) {
+        vy = -8;
+        onGround = false;
+      }
+    }
+    window.addEventListener('keydown', e => {
+      if (e.code === 'Space' || e.code === 'ArrowUp') doJump();
+    });
+    c.addEventListener('mousedown', doJump);
+    c.addEventListener('touchstart', e => { e.preventDefault(); doJump(); });
+
+    function update() {
+      if (gameOver) return;
+      vy += 0.5;
+      marioY += vy;
+      if (marioY > H - MARIO_H - 10) {
+        marioY = H - MARIO_H - 10;
+        vy = 0;
+        onGround = true;
+      }
+      spawnTimer++;
+      if (spawnTimer > 90 + Math.random()*60) {
+        obstacles.push({
+          x: W,
+          w: 20 + Math.random()*10,
+          h: 20 + Math.random()*20
+        });
+        spawnTimer = 0;
+      }
+      obstacleSpeed += 0.001;
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        obstacles[i].x -= obstacleSpeed;
+        if (obstacles[i].x + obstacles[i].w < 0) obstacles.splice(i,1);
+      }
+      const marioB = marioY + MARIO_H;
+      for (const o of obstacles) {
+        const obsT = H - 10 - o.h;
+        if (
+          START_X < o.x + o.w &&
+          START_X + MARIO_W > o.x &&
+          marioB > obsT
+        ) {
+          gameOver = true;
+          break;
         }
+      }
+    }
 
-        function create() {
-            // Background
-            this.add.image(400, 300, 'sky');
+    function draw() {
+      ctx.clearRect(0,0,W,H);
+      ctx.fillStyle = '#654321';
+      ctx.fillRect(0, H-10, W, 10);
+      ctx.drawImage(sprite, 0,0, sprite.width, sprite.height,
+                    START_X, marioY, MARIO_W, MARIO_H);
+      ctx.fillStyle = '#0a0';
+      for (const o of obstacles) {
+        ctx.fillRect(o.x, H - 10 - o.h, o.w, o.h);
+      }
+      if (gameOver) {
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(0,0,W,H);
+        ctx.fillStyle = '#f00';
+        ctx.font = '30px sans-serif';
+        ctx.fillText('Game Over', W/2 - 80, H/2);
+      }
+    }
 
-            // Platforms
-            platforms = this.physics.add.staticGroup();
-            platforms.create(400, 568, 'ground').setScale(2).refreshBody();
-            platforms.create(600, 400, 'ground');
-            platforms.create(50, 250, 'ground');
-            platforms.create(750, 220, 'ground');
+    function loop() {
+      update();
+      draw();
+      if (!gameOver) loopId = requestAnimationFrame(loop);
+    }
 
-            // Player
-            player = this.physics.add.sprite(100, 450, 'dude');
-            player.setBounce(0.2);
-            player.setCollideWorldBounds(true);
-
-            // Animations
-            this.anims.create({
-                key: 'left',
-                frames: this.anims.generateFrameNumbers('dude', { start: 0, end: 3 }),
-                frameRate: 10,
-                repeat: -1
-            });
-
-            this.anims.create({
-                key: 'turn',
-                frames: [{ key: 'dude', frame: 4 }],
-                frameRate: 20
-            });
-
-            this.anims.create({
-                key: 'right',
-                frames: this.anims.generateFrameNumbers('dude', { start: 5, end: 8 }),
-                frameRate: 10,
-                repeat: -1
-            });
-
-            // Physics
-            this.physics.add.collider(player, platforms);
-
-            // Controls
-            cursors = this.input.keyboard.createCursorKeys();
-        }
-
-        function update() {
-            if (cursors.left.isDown) {
-                player.setVelocityX(-160);
-                player.anims.play('left', true);
-            } else if (cursors.right.isDown) {
-                player.setVelocityX(160);
-                player.anims.play('right', true);
-            } else {
-                player.setVelocityX(0);
-                player.anims.play('turn');
-            }
-
-            if (cursors.up.isDown && player.body.touching.down) {
-                player.setVelocityY(-330);
-            }
-        }
-    </script>
+    resetState();
+    sprite.onload  = () => loop();
+    sprite.onerror = () => loop();
+  })();
+  </script>
 </body>
 </html>
