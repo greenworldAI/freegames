@@ -11,6 +11,7 @@
       display: flex;
       justify-content: center;
       background: #0a1f3a;
+      font-family: sans-serif;
     }
     #game-container {
       width: clamp(300px, 90vw, 600px);
@@ -19,7 +20,7 @@
       width: 100%;
       height: 200px;
       background: #5c94fc; /* sky */
-      touch-action: none;  /* prevent mobile scroll */
+      touch-action: none;   /* prevent mobile scroll */
       border: 2px solid #333;
       border-radius: 8px;
       display: block;
@@ -36,17 +37,24 @@
           ctx    = canvas.getContext('2d'),
           W      = 600,
           H      = 200;
+
     canvas.width  = W;
     canvas.height = H;
 
     const sprite = new Image();
     sprite.src   = 'https://greenworldai.github.io/freegames/assets/mario-sprite.png';
 
-    const MARIO_W = 64, MARIO_H = 64, START_X = 50, GRAVITY = 0.5;
+    const MARIO_W  = 64,
+          MARIO_H  = 64,
+          START_X  = 50,
+          GRAVITY  = 0.5;
+
     let marioY, vy, onGround, gameOver;
     let obstacles, spawnTimer, spawnInterval, obstacleSpeed;
 
-    function randomRange(a,b){ return a + Math.random()*(b-a); }
+    function randomInt(min, max) {
+      return Math.floor(min + Math.random() * (max - min + 1));
+    }
 
     function resetState(){
       marioY        = H - MARIO_H - 10;
@@ -55,39 +63,40 @@
       gameOver      = false;
       obstacles     = [];
       spawnTimer    = 0;
-      spawnInterval = Math.floor(randomRange(60,120));
+      spawnInterval = randomInt(60, 120);
       obstacleSpeed = 4;
-      console.log('Game reset');
     }
 
     function doJump(){
       if(!gameOver && onGround){
         vy = -8;
         onGround = false;
-        console.log('Jump');
       }
     }
 
     function handleInput(e){
       e.preventDefault();
-      if(gameOver) {
+      if(gameOver){
         resetState();
       } else {
         doJump();
       }
     }
 
-    // allow both mouse/touch and keyboard
+    // Make canvas focusable for keyboard
+    canvas.tabIndex = 0;
     canvas.addEventListener('pointerdown', e => {
       canvas.focus();
       handleInput(e);
     });
-    window.addEventListener('keydown', e => {
-      if(e.code==='Space' || e.code==='ArrowUp') handleInput(e);
+    canvas.addEventListener('keydown', e => {
+      if(e.code === 'Space' || e.code === 'ArrowUp'){
+        handleInput(e);
+      }
     });
 
     function update(){
-      // physics
+      // gravity & ground collision
       vy += GRAVITY;
       marioY += vy;
       if(marioY > H - MARIO_H - 10){
@@ -95,38 +104,46 @@
         vy = 0;
         onGround = true;
       }
-      // spawn
+
+      // spawn new obstacle
       spawnTimer++;
       if(spawnTimer >= spawnInterval){
         obstacles.push({
           x: W,
-          w: 20 + randomRange(0,10),
-          h: 20 + randomRange(0,20)
+          w: 20 + Math.random()*10,
+          h: 20 + Math.random()*20
         });
         spawnTimer = 0;
-        spawnInterval = Math.floor(randomRange(60,120));
+        spawnInterval = randomInt(60, 120);
       }
-      // speed up
+
+      // speed up slightly
       obstacleSpeed += 0.0005;
-      // move & remove off-screen
-      for(let i=obstacles.length-1;i>=0;i--){
+
+      // move obstacles & remove off-screen
+      for(let i = obstacles.length - 1; i >= 0; i--){
         obstacles[i].x -= obstacleSpeed;
         if(obstacles[i].x + obstacles[i].w < 0){
-          obstacles.splice(i,1);
+          obstacles.splice(i, 1);
         }
       }
-      // collision
-      const mBottom = marioY + MARIO_H;
+
+      // collision detection (AABB)
+      const mLeft   = START_X,
+            mRight  = START_X + MARIO_W,
+            mTop    = marioY,
+            mBottom = marioY + MARIO_H;
+
       for(const o of obstacles){
-        const oTop = H - 10 - o.h;
-        if(
-          START_X < o.x + o.w &&
-          START_X + MARIO_W > o.x &&
-          mBottom > oTop
-        ){
-          if(!gameOver){
-            console.log('Collision — Game Over');
-          }
+        const oLeft   = o.x,
+              oRight  = o.x + o.w,
+              oBottom = H - 10,
+              oTop    = oBottom - o.h;
+
+        if(mRight > oLeft &&
+           mLeft  < oRight &&
+           mBottom> oTop &&
+           mTop    < oBottom){
           gameOver = true;
           break;
         }
@@ -134,31 +151,35 @@
     }
 
     function draw(){
-      // clear
-      ctx.clearRect(0,0,W,H);
-      // ground
+      // clear canvas
+      ctx.clearRect(0, 0, W, H);
+
+      // draw ground
       ctx.fillStyle = '#654321';
-      ctx.fillRect(0, H-10, W, 10);
-      // Mario
+      ctx.fillRect(0, H - 10, W, 10);
+
+      // draw Mario if sprite ready
       if(sprite.complete){
         ctx.drawImage(
           sprite,
-          0,0, sprite.width, sprite.height,
+          0, 0, sprite.width, sprite.height,
           START_X, marioY, MARIO_W, MARIO_H
         );
       }
-      // obstacles
+
+      // draw obstacles
       ctx.fillStyle = '#0a0';
       for(const o of obstacles){
         ctx.fillRect(o.x, H - 10 - o.h, o.w, o.h);
       }
-      // overlay on game over
+
+      // game over overlay
       if(gameOver){
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
         ctx.fillRect(0,0,W,H);
         ctx.fillStyle = '#f00';
         ctx.font = '20px sans-serif';
-        ctx.fillText('Game Over — Click/Space to Restart', 10, H/2);
+        ctx.fillText('Game Over — Tap/Space to Restart', 10, H / 2);
       }
     }
 
@@ -168,9 +189,10 @@
       requestAnimationFrame(loop);
     }
 
-    // start
+    // start game
     resetState();
-    loop();
+    sprite.onload  = () => loop();
+    sprite.onerror = () => loop();
   })();
   </script>
 </body>
