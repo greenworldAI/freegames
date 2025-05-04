@@ -16,8 +16,8 @@
     canvas {
       width: 100%;
       height: 200px;
-      background: #5c94fc; /* sky */
-      touch-action: none;  /* mobile tap */
+      background: #5c94fc;
+      touch-action: none;    /* prevent scrolling on mobile tap */
       border: 2px solid #333;
       border-radius: 8px;
       display: block;
@@ -26,23 +26,24 @@
 </head>
 <body>
   <div id="game-container">
-    <canvas id="game"></canvas>
+    <canvas id="game" tabindex="0"></canvas>
   </div>
   <script>
   (function(){
     const canvas = document.getElementById('game'),
           ctx    = canvas.getContext('2d'),
-          W      = 600, H = 200;
-    canvas.width = W;
+          W      = 600,
+          H      = 200;
+    canvas.width  = W;
     canvas.height = H;
 
     const sprite = new Image();
     sprite.src   = 'https://greenworldai.github.io/freegames/assets/mario-sprite.png';
 
     const MARIO_W = 64, MARIO_H = 64, START_X = 50;
-    let marioY, vy, onGround, gameOver, obstacles, spawnTimer, obstacleSpeed;
+    let marioY, vy, onGround, gameOver, obstacles, spawnTimer, obstacleSpeed, loopId;
 
-    function resetState(){
+    function resetState() {
       marioY        = H - MARIO_H - 10;
       vy            = 0;
       onGround      = true;
@@ -50,50 +51,53 @@
       obstacles     = [];
       spawnTimer    = 0;
       obstacleSpeed = 4;
-      console.log('↻ Game reset');
     }
 
-    function doJump(){
-      if(!gameOver && onGround){
+    function doJump() {
+      if (!gameOver && onGround) {
         vy = -8;
         onGround = false;
-        console.log('▲ Jump');
       }
     }
 
-    function handleInput(e){
+    function handleInput(e) {
       e.preventDefault();
-      if(gameOver){
+      if (gameOver) {
         resetState();
       } else {
         doJump();
       }
     }
 
-    // clicks/taps
-    canvas.addEventListener('pointerdown', handleInput);
-    // keyboard
-    window.addEventListener('keydown', e=>{
-      if(e.code==='Space' || e.code==='ArrowUp') handleInput(e);
+    // Make canvas focusable and handle both pointer and keyboard
+    canvas.tabIndex = 0;
+    canvas.addEventListener('pointerdown', e => {
+      canvas.focus();
+      handleInput(e);
+    });
+    canvas.addEventListener('keydown', e => {
+      if (e.code === 'Space' || e.code === 'ArrowUp') {
+        handleInput(e);
+      }
     });
 
-    function update(){
-      // gravity + ground
+    function update() {
+      // gravity & ground
       vy += 0.5;
       marioY += vy;
-      if(marioY > H - MARIO_H - 10){
-        marioY = H - MARIO_H - 10;
-        vy = 0;
+      if (marioY > H - MARIO_H - 10) {
+        marioY   = H - MARIO_H - 10;
+        vy       = 0;
         onGround = true;
       }
 
       // spawn obstacles
       spawnTimer++;
-      if(spawnTimer > 90 + Math.random()*60){
+      if (spawnTimer > 90 + Math.random() * 60) {
         obstacles.push({
           x: W,
-          w: 20 + Math.random()*10,
-          h: 20 + Math.random()*20
+          w: 20 + Math.random() * 10,
+          h: 20 + Math.random() * 20
         });
         spawnTimer = 0;
       }
@@ -101,69 +105,71 @@
       // speed up slowly
       obstacleSpeed += 0.0005;
 
-      // move & cull
-      for(let i=obstacles.length-1;i>=0;i--){
+      // move obstacles & remove off-screen
+      for (let i = obstacles.length - 1; i >= 0; i--) {
         obstacles[i].x -= obstacleSpeed;
-        if(obstacles[i].x + obstacles[i].w < 0){
-          obstacles.splice(i,1);
+        if (obstacles[i].x + obstacles[i].w < 0) {
+          obstacles.splice(i, 1);
         }
       }
 
-      // collision?
-      const marioB = marioY + MARIO_H;
-      for(const o of obstacles){
-        const obsT = H - 10 - o.h;
-        if(
+      // collision detection
+      const marioBottom = marioY + MARIO_H;
+      for (const o of obstacles) {
+        const obsTop = H - 10 - o.h;
+        if (
           START_X < o.x + o.w &&
           START_X + MARIO_W > o.x &&
-          marioB > obsT
-        ){
-          if(!gameOver){
-            console.log('✖ Collision — Game Over');
+          marioBottom > obsTop
+        ) {
+          if (!gameOver) {
+            gameOver = true;
           }
-          gameOver = true;
           break;
         }
       }
     }
 
-    function draw(){
-      ctx.clearRect(0,0,W,H);
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+
       // ground
       ctx.fillStyle = '#654321';
-      ctx.fillRect(0, H-10, W, 10);
+      ctx.fillRect(0, H - 10, W, 10);
+
       // Mario
       ctx.drawImage(
         sprite,
-        0,0, sprite.width, sprite.height,
+        0, 0, sprite.width, sprite.height,
         START_X, marioY, MARIO_W, MARIO_H
       );
+
       // obstacles
       ctx.fillStyle = '#0a0';
-      for(const o of obstacles){
-        ctx.fillRect(o.x, H-10-o.h, o.w, o.h);
+      for (const o of obstacles) {
+        ctx.fillRect(o.x, H - 10 - o.h, o.w, o.h);
       }
-      // overlay on Game Over
-      if(gameOver){
-        ctx.fillStyle='rgba(0,0,0,0.5)';
-        ctx.fillRect(0,0,W,H);
-        ctx.fillStyle='#f00';
-        ctx.font='20px sans-serif';
-        ctx.fillText('Game Over — Tap/Space to Restart', 10, H/2);
+
+      // Game Over overlay
+      if (gameOver) {
+        ctx.fillStyle = 'rgba(0,0,0,0.5)';
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#f00';
+        ctx.font = '20px sans-serif';
+        ctx.fillText('Game Over — Tap/Space to Restart', 10, H / 2);
       }
     }
 
-    // single, perpetual loop
-    function loop(){
+    function loop() {
       update();
       draw();
       requestAnimationFrame(loop);
     }
 
-    // init and start
+    // initialize and start
     resetState();
-    sprite.onload  = ()=> loop();
-    sprite.onerror = ()=> loop();
+    sprite.onload  = () => loop();
+    sprite.onerror = () => loop();
   })();
   </script>
 </body>
