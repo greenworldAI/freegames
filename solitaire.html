@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solitaire - Zentroll</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #2e7d32;
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: white;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+        #test-element {
+            font-size: 24px;
+            color: yellow;
+            margin-bottom: 20px;
+            display: block !important;
+            visibility: visible !important;
+        }
+        #solitaire-game-container {
+            max-width: 100%;
+            width: 800px;
+            display: block !important;
+            visibility: visible !important;
+            box-sizing: border-box;
+        }
+        .solitaire-pile {
+            display: inline-block;
+            width: 13%;
+            min-width: 60px;
+            min-height: 140px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            margin: 5px;
+            position: relative;
+            vertical-align: top;
+            box-sizing: border-box;
+        }
+        .solitaire-card {
+            width: 100%;
+            padding-top: 140%;
+            background: white;
+            border: 1px solid #000;
+            border-radius: 5px;
+            position: absolute;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+            display: block !important;
+            visibility: visible !important;
+            pointer-events: auto !important;
+            z-index: 10;
+            box-sizing: border-box;
+        }
+        .solitaire-card-content {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 20px;
+            font-weight: bold;
+            color: inherit;
+            display: block !important;
+            visibility: visible !important;
+            z-index: 20;
+            pointer-events: none;
+        }
+        .solitaire-card.red { color: red; }
+        .solitaire-card.black { color: black; }
+        .solitaire-card.face-down {
+            background: linear-gradient(45deg, #0000FF, #1e90ff);
+            background-size: cover;
+            pointer-events: none;
+        }
+        .solitaire-card.selected {
+            border: 2px solid yellow !important;
+            z-index: 15;
+        }
+        .solitaire-stock, .solitaire-waste, .solitaire-foundation {
+            width: 13%;
+            min-width: 60px;
+            min-height: 140px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
+            margin: 5px;
+            display: inline-block;
+            vertical-align: top;
+            box-sizing: border-box;
+            pointer-events: auto !important;
+        }
+        #solitaire-top-row, #solitaire-tableau {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: nowrap;
+            width: 100%;
+        }
+        button {
+            padding: 8px 16px;
+            font-size: 14px;
+            margin: 10px;
+            background: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            pointer-events: auto !important;
+            display: inline-block !important;
+            z-index: 30;
+        }
+        @media (max-width: 600px) {
+            #solitaire-game-container {
+                width: 100%;
+            }
+            .solitaire-pile, .solitaire-stock, .solitaire-waste, .solitaire-foundation {
+                width: 15%;
+                min-width: 50px;
+                min-height: 100px;
+            }
+            .solitaire-card-content {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="test-element">TEST ELEMENT - SHOULD BE VISIBLE</div>
+    <h1>Solitaire</h1>
+    <button id="new-game-btn">New Game</button>
+    <button id="redraw-btn">Redraw</button>
+    <button id="debug-btn">Debug DOM</button>
+    <div id="solitaire-game-container">
+        <div id="solitaire-top-row">
+            <div class="solitaire-stock" id="solitaire-stock"></div>
+            <div class="solitaire-waste" id="solitaire-waste"></div>
+            <div class="solitaire-foundation" id="solitaire-foundation-0"></div>
+            <div class="solitaire-foundation" id="solitaire-foundation-1"></div>
+            <div class="solitaire-foundation" id="solitaire-foundation-2"></div>
+            <div class="solitaire-foundation" id="solitaire-foundation-3"></div>
+        </div>
+        <div id="solitaire-tableau">
+            <div class="solitaire-pile" id="solitaire-pile-0"></div>
+            <div class="solitaire-pile" id="solitaire-pile-1"></div>
+            <div class="solitaire-pile" id="solitaire-pile-2"></div>
+            <div class="solitaire-pile" id="solitaire-pile-3"></div>
+            <div class="solitaire-pile" id="solitaire-pile-4"></div>
+            <div class="solitaire-pile" id="solitaire-pile-5"></div>
+            <div class="solitaire-pile" id="solitaire-pile-6"></div>
+        </div>
+    </div>
+
+    <script>
+        const suits = ['Spades', 'Clubs', 'Hearts', 'Diamonds'];
+        const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+        let deck = [];
+        let stock = [];
+        let waste = [];
+        let tableau = [[], [], [], [], [], [], []];
+        let foundations = [[], [], [], []];
+        let selectedCard = null;
+        let sourcePile = null;
+
+        function createDeck() {
+            deck = [];
+            for (let suit of suits) {
+                for (let rank of ranks) {
+                    deck.push({ suit, rank, faceUp: false });
+                }
+            }
+            shuffle(deck);
+            console.log('Deck created:', deck.length, 'cards');
+        }
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        function deal() {
+            stock = [...deck];
+            tableau = [[], [], [], [], [], [], []];
+            foundations = [[], [], [], []];
+            waste = [];
+            for (let i = 0; i < 7; i++) {
+                for (let j = i; j < 7; j++) {
+                    const card = stock.pop();
+                    card.faceUp = (j === i);
+                    tableau[j].push(card);
+                }
+            }
+            console.log('Dealt tableau:', tableau);
+            render();
+        }
+
+        function render() {
+            console.log('Rendering tableau:', tableau);
+            const container = document.getElementById('solitaire-game-container');
+            if (!container) {
+                console.error('Game container not found');
+                return;
+            }
+            const stockEl = document.getElementById('solitaire-stock');
+            if (stockEl) {
+                stockEl.innerHTML = stock.length ? '<div class="solitaire-card face-down"></div>' : '';
+            } else {
+                console.error('Stock element not found');
+            }
+            const wasteEl = document.getElementById('solitaire-waste');
+            if (wasteEl) {
+                wasteEl.innerHTML = waste.length ? createCardElement(waste[waste.length - 1]).outerHTML : '';
+            } else {
+                console.error('Waste element not found');
+            }
+            for (let i = 0; i < 7; i++) {
+                const pileEl = document.getElementById(`solitaire-pile-${i}`);
+                if (pileEl) {
+                    pileEl.innerHTML = '';
+                    tableau[i].forEach((card, index) => {
+                        const cardEl = createCardElement(card);
+                        cardEl.style.top = `${index * 25}px`;
+                        pileEl.appendChild(cardEl);
+                    });
+                    console.log(`Rendered pile ${i}: ${tableau[i].length} cards`);
+                } else {
+                    console.error(`Pile ${i} element not found`);
+                }
+            }
+            for (let i = 0; i < 4; i++) {
+                const foundationEl = document.getElementById(`solitaire-foundation-${i}`);
+                if (foundationEl) {
+                    foundationEl.innerHTML = foundations[i].length ? createCardElement(foundations[i][foundations[i].length - 1]).outerHTML : '';
+                } else {
+                    console.error(`Foundation ${i} element not found`);
+                }
+            }
+            reattachListeners();
+        }
+
+        function createCardElement(card) {
+            const cardEl = document.createElement('div');
+            cardEl.className = `solitaire-card ${card.faceUp ? (['Hearts', 'Diamonds'].includes(card.suit) ? 'red' : 'black') : 'face-down'}`;
+            cardEl.dataset.suit = card.suit;
+            cardEl.dataset.rank = card.rank;
+            if (card.faceUp) {
+                const contentEl = document.createElement('div');
+                contentEl.className = 'solitaire-card-content';
+                contentEl.textContent = `${card.rank} ${card.suit}`;
+                cardEl.appendChild(contentEl);
+            }
+            console.log(`Created card: ${card.rank} ${card.suit}, faceUp: ${card.faceUp}`);
+            return cardEl;
+        }
+
+        function selectCard(event) {
+            const cardEl = event.target.closest('.solitaire-card');
+            if (!cardEl || cardEl.classList.contains('face-down')) {
+                console.log('Ignored click on invalid or face-down card');
+                return;
+            }
+            console.log('Click detected on:', cardEl.dataset.rank, cardEl.dataset.suit);
+            if (selectedCard) {
+                const targetPile = findTargetPile(event.target);
+                if (targetPile && selectedCard !== cardEl) {
+                    const card = { suit: selectedCard.dataset.suit, rank: selectedCard.dataset.rank, faceUp: true };
+                    if (isValidMove([card], targetPile)) {
+                        moveCards([card], sourcePile, targetPile);
+                        checkWin();
+                    } else {
+                        console.log('Invalid move attempted:', card.rank, card.suit, 'to', targetPile.type, targetPile.index);
+                    }
+                }
+                selectedCard.classList.remove('selected');
+                if (selectedCard === cardEl) {
+                    selectedCard = null;
+                    sourcePile = null;
+                    console.log('Deselected card');
+                    return;
+                }
+            }
+            selectedCard = cardEl;
+            sourcePile = findSourcePile(cardEl);
+            if (!sourcePile) {
+                console.error('Source pile not found for card:', cardEl.dataset.rank, cardEl.dataset.suit);
+                selectedCard = null;
+                return;
+            }
+            cardEl.classList.add('selected');
+            console.log(`Selected card: ${cardEl.dataset.rank} ${cardEl.dataset.suit}, source: ${sourcePile.type}${sourcePile.index !== undefined ? '-' + sourcePile.index : ''}`);
+            render();
+        }
+
+        function findSourcePile(cardEl) {
+            const parent = cardEl.closest('.solitaire-pile, .solitaire-waste, .solitaire-foundation');
+            if (!parent) {
+                console.error('No parent pile found for card:', cardEl.dataset.rank, cardEl.dataset.suit);
+                return null;
+            }
+            if (parent.id === 'solitaire-waste') return { type: 'waste' };
+            for (let i = 0; i < 7; i++) {
+                if (parent.id === `solitaire-pile-${i}`) return { type: 'tableau', index: i };
+            }
+            for (let i = 0; i < 4; i++) {
+                if (parent.id === `solitaire-foundation-${i}`) return { type: 'foundation', index: i };
+            }
+            console.error('Unknown parent pile:', parent.id);
+            return null;
+        }
+
+        function findTargetPile(target) {
+            const pileEl = target.closest('.solitaire-pile, .solitaire-foundation');
+            if (!pileEl) {
+                console.log('No target pile found');
+                return null;
+            }
+            if (pileEl.classList.contains('solitaire-pile')) {
+                const index = parseInt(pileEl.id.split('-')[2]);
+                return { type: 'tableau', index };
+            }
+            if (pileEl.classList.contains('solitaire-foundation')) {
+                const index = parseInt(pileEl.id.split('-')[2]);
+                return { type: 'foundation', index };
+            }
+            console.log('Unknown target pile:', pileEl.id);
+            return null;
+        }
+
+        function isValidMove(cards, targetPile) {
+            const topCard = cards[0];
+            if (targetPile.type === 'foundation') {
+                const foundation = foundations[targetPile.index];
+                if (foundation.length === 0) return topCard.rank === 'A';
+                const topFoundationCard = foundation[foundation.length - 1];
+                return topCard.suit === topFoundationCard.suit && ranks.indexOf(topCard.rank) === ranks.indexOf(topFoundationCard.rank) + 1;
+            }
+            if (targetPile.type === 'tableau') {
+                const pile = tableau[targetPile.index];
+                if (pile.length === 0) return topCard.rank === 'K';
+                const topPileCard = pile[pile.length - 1];
+                const isRed = ['Hearts', 'Diamonds'].includes(topCard.suit);
+                const topIsBlack = ['Spades', 'Clubs'].includes(topPileCard.suit);
+                return (isRed && topIsBlack || !isRed && !topIsBlack) && ranks.indexOf(topCard.rank) === ranks.indexOf(topPileCard.rank) - 1;
+            }
+            return false;
+        }
+
+        function moveCards(cards, source, target) {
+            if (source.type === 'waste') waste.pop();
+            else if (source.type === 'tableau') tableau[source.index].pop();
+            else if (source.type === 'foundation') foundations[source.index].pop();
+            if (target.type === 'tableau') {
+                tableau[target.index].push(cards[0]);
+                if (source.type === 'tableau' && tableau[source.index].length) {
+                    tableau[source.index][tableau[source.index].length - 1].faceUp = true;
+                }
+            } else if (target.type === 'foundation') {
+                foundations[target.index].push(cards[0]);
+            }
+            console.log(`Moved ${cards[0].rank} ${cards[0].suit} from ${source.type}${source.index !== undefined ? '-' + source.index : ''} to ${target.type}${target.index !== undefined ? '-' + target.index : ''}`);
+            selectedCard = null;
+            sourcePile = null;
+            render();
+        }
+
+        function drawCard() {
+            console.log('Stock clicked');
+            if (stock.length) {
+                const card = stock.pop();
+                card.faceUp = true;
+                waste.push(card);
+            } else if (waste.length) {
+                stock = waste.reverse().map(card => ({ ...card, faceUp: false }));
+                waste = [];
+            }
+            render();
+        }
+
+        function checkWin() {
+            if (foundations.every(f => f.length === 13)) alert('You won!');
+        }
+
+        function newGame() {
+            console.log('New Game clicked');
+            createDeck();
+            deal();
+        }
+
+        function debugDOM() {
+            const container = document.getElementById('solitaire-game-container');
+            console.log('DOM Debug: Container exists?', !!container);
+            if (container) {
+                console.log('Tableau HTML:', document.getElementById('solitaire-tableau').innerHTML);
+                console.log('Top Row HTML:', document.getElementById('solitaire-top-row').innerHTML);
+            }
+        }
+
+        function reattachListeners() {
+            document.querySelectorAll('.solitaire-card:not(.face-down)').forEach(card => {
+                card.removeEventListener('click', selectCard);
+                card.addEventListener('click', selectCard);
+            });
+            const stockEl = document.getElementById('solitaire-stock');
+            if (stockEl) {
+                stockEl.removeEventListener('click', drawCard);
+                stockEl.addEventListener('click', drawCard);
+                console.log('Stock listener reattached');
+            }
+            console.log('Reattached listeners for cards and stock');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('DOM Loaded');
+            const stockEl = document.getElementById('solitaire-stock');
+            if (stockEl) {
+                stockEl.addEventListener('click', drawCard);
+                console.log('Stock listener attached');
+            } else {
+                console.error('Stock element not found on load');
+            }
+            const newGameBtn = document.getElementById('new-game-btn');
+            if (newGameBtn) {
+                newGameBtn.addEventListener('click', newGame);
+                console.log('New Game listener attached');
+            }
+            const redrawBtn = document.getElementById('redraw-btn');
+            if (redrawBtn) {
+                redrawBtn.addEventListener('click', render);
+                console.log('Redraw listener attached');
+            }
+            const debugBtn = document.getElementById('debug-btn');
+            if (debugBtn) {
+                debugBtn.addEventListener('click', debugDOM);
+                console.log('Debug DOM listener attached');
+            }
+            newGame();
+            setInterval(reattachListeners, 1000);
+        });
+    </script>
+</body>
+</html>
