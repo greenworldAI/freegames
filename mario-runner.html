@@ -14,6 +14,7 @@
       width: clamp(300px, 90vw, 600px);
       height: 200px;
       background: #5c94fc; /* sky */
+      touch-action: none;  /* prevent scrolling on touch */
       display: block;
     }
   </style>
@@ -30,7 +31,6 @@
 
     // load your sprite
     const sprite = new Image();
-    // use absolute URL so iframe can't confuse paths
     sprite.src = 'https://greenworldai.github.io/freegames/assets/mario-sprite.png';
 
     // Mario size & physics
@@ -43,12 +43,22 @@
     const obstacles = [];
     let spawnTimer = 0;
 
-    // jump on Space or ↑
-    window.addEventListener('keydown', e => {
-      if ((e.code === 'Space' || e.code === 'ArrowUp') && onGround) {
+    // jump function (keyboard, click, touch)
+    function doJump() {
+      if (onGround) {
         vy = -8;
         onGround = false;
       }
+    }
+    window.addEventListener('keydown', e => {
+      if (e.code === 'Space' || e.code === 'ArrowUp') {
+        doJump();
+      }
+    });
+    canvas.addEventListener('mousedown', doJump);
+    canvas.addEventListener('touchstart', e => {
+      e.preventDefault();
+      doJump();
     });
 
     function update() {
@@ -61,13 +71,13 @@
         onGround = true;
       }
 
-      // spawn
+      // spawn obstacles
       spawnTimer++;
-      if (spawnTimer > 90 + Math.random()*60) {
+      if (spawnTimer > 90 + Math.random() * 60) {
         obstacles.push({
           x: W,
-          w: 20 + Math.random()*10,
-          h: 20 + Math.random()*20
+          w: 20 + Math.random() * 10,
+          h: 20 + Math.random() * 20
         });
         spawnTimer = 0;
       }
@@ -76,11 +86,11 @@
       for (let i = obstacles.length - 1; i >= 0; i--) {
         obstacles[i].x -= 4;
         if (obstacles[i].x + obstacles[i].w < 0) {
-          obstacles.splice(i,1);
+          obstacles.splice(i, 1);
         }
       }
 
-      // collision
+      // collision?
       for (let o of obstacles) {
         if (
           o.x < 50 + MARIO_W &&
@@ -93,6 +103,7 @@
           ctx.fillStyle = '#f00';
           ctx.font = '30px sans-serif';
           ctx.fillText('Game Over', W/2 - 80, H/2);
+          return; // stop updating
         }
       }
     }
@@ -101,11 +112,11 @@
       ctx.clearRect(0,0,W,H);
       // ground
       ctx.fillStyle = '#654321';
-      ctx.fillRect(0, H-10, W, 10);
+      ctx.fillRect(0, H - 10, W, 10);
       // Mario
       ctx.drawImage(
         sprite,
-        0,0, sprite.width, sprite.height,
+        0, 0, sprite.width, sprite.height,
         50, marioY, MARIO_W, MARIO_H
       );
       // obstacles
@@ -122,13 +133,10 @@
       loopId = requestAnimationFrame(loop);
     }
 
-    // Kick off the loop *once* the sprite URL is set.
-    sprite.onload = () => loop();
-    sprite.onerror = () => {
-      console.error('Could not load sprite:', sprite.src);
-      // still start game so you can debug
-      loop();
-    };
+    // Start immediately (sprite may be blank until loaded)
+    loop();
+    // Once the sprite loads, it'll draw correctly
+    sprite.onerror = () => console.error('Sprite failed to load:', sprite.src);
   })();
   </script>
 </body>
