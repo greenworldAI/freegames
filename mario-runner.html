@@ -6,15 +6,17 @@
   <title>Zentroll Mario Runner</title>
   <style>
     body {
-      margin: 0; padding: 0;
-      display: flex; justify-content: center;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
       background: #0a1f3a;
     }
     canvas {
       width: clamp(300px, 90vw, 600px);
       height: 200px;
       background: #5c94fc; /* sky */
-      touch-action: none;  /* prevent scrolling on mobile */
+      touch-action: none;  /* prevent scroll on mobile */
       display: block;
     }
   </style>
@@ -22,7 +24,7 @@
 <body>
   <canvas id="game"></canvas>
   <script>
-  (()=>{
+  (() => {
     const canvas = document.getElementById('game'),
           ctx    = canvas.getContext('2d'),
           W      = 600,
@@ -30,24 +32,22 @@
     canvas.width  = W;
     canvas.height = H;
 
-    // load your uploaded sprite via absolute URL
+    // Absolute URL to your uploaded sprite
     const sprite = new Image();
     sprite.src   = 'https://greenworldai.github.io/freegames/assets/mario-sprite.png';
 
-    // Mario constants & state
-    const MARIO_W  = 64,
-          MARIO_H  = 64,
-          START_X  = 50;
-    let marioY    = H - MARIO_H - 10,
-        vy        = 0,
-        onGround  = true,
-        gameOver  = false;
+    // Mario size & start position
+    const MARIO_W = 64, MARIO_H = 64, START_X = 50;
+    let marioY   = H - MARIO_H - 10,
+        vy       = 0,
+        onGround = true,
+        gameOver = false;
 
-    // Obstacles array & spawn timer
+    // Obstacles
     const obstacles = [];
     let spawnTimer = 0;
 
-    // Jump logic (keyboard, click, touch)
+    // Handle jump (keyboard, click, touch)
     function doJump() {
       if (onGround && !gameOver) {
         vy = -8;
@@ -58,16 +58,13 @@
       if (e.code === 'Space' || e.code === 'ArrowUp') doJump();
     });
     canvas.addEventListener('mousedown',  doJump);
-    canvas.addEventListener('touchstart', e => {
-      e.preventDefault();
-      doJump();
-    });
+    canvas.addEventListener('touchstart', e => { e.preventDefault(); doJump(); });
 
-    // Update game state
+    // Update positions & game logic
     function update() {
       if (gameOver) return;
 
-      // gravity + ground collision
+      // Gravity & ground
       vy += 0.5;
       marioY += vy;
       if (marioY > H - MARIO_H - 10) {
@@ -76,7 +73,7 @@
         onGround = true;
       }
 
-      // spawn obstacles every ~1.5–2.5s
+      // Spawn obstacles
       spawnTimer++;
       if (spawnTimer > 90 + Math.random() * 60) {
         obstacles.push({
@@ -87,7 +84,7 @@
         spawnTimer = 0;
       }
 
-      // move obstacles left, and remove off-screen
+      // Move and cull obstacles
       for (let i = obstacles.length - 1; i >= 0; i--) {
         obstacles[i].x -= 4;
         if (obstacles[i].x + obstacles[i].w < 0) {
@@ -95,9 +92,9 @@
         }
       }
 
-      // collision detection
+      // Collision detection
       const marioBottom = marioY + MARIO_H;
-      for (let o of obstacles) {
+      for (const o of obstacles) {
         const obsTop = H - 10 - o.h;
         if (
           START_X < o.x + o.w &&
@@ -114,20 +111,20 @@
     function draw() {
       ctx.clearRect(0, 0, W, H);
 
-      // ground
+      // Ground
       ctx.fillStyle = '#654321';
       ctx.fillRect(0, H - 10, W, 10);
 
-      // Mario sprite
+      // Mario
       ctx.drawImage(
         sprite,
         0, 0, sprite.width, sprite.height,
         START_X, marioY, MARIO_W, MARIO_H
       );
 
-      // obstacles
+      // Obstacles
       ctx.fillStyle = '#0a0';
-      for (let o of obstacles) {
+      for (const o of obstacles) {
         ctx.fillRect(o.x, H - 10 - o.h, o.w, o.h);
       }
 
@@ -137,7 +134,7 @@
         ctx.fillRect(0, 0, W, H);
         ctx.fillStyle = '#f00';
         ctx.font = '30px sans-serif';
-        ctx.fillText('Game Over', W / 2 - 80, H / 2);
+        ctx.fillText('Game Over', W/2 - 80, H/2);
       }
     }
 
@@ -149,12 +146,8 @@
       if (!gameOver) loopId = requestAnimationFrame(loop);
     }
 
-    // Start the loop once the sprite is available (or even if it errors)
-    sprite.onload  = () => loop();
-    sprite.onerror = () => {
-      console.error('Failed to load sprite:', sprite.src);
-      loop();
-    };
+    // Start immediately
+    loop();
   })();
   </script>
 </body>
