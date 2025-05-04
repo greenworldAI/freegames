@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Zentroll Mario Runner</title>
+  <style>
+    body { margin:0; display:flex; justify-content:center; background:#0a1f3a; }
+    canvas {
+      width: clamp(300px, 90vw, 600px);
+      height: 200px;
+      background: #5c94fc; /* sky blue */
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+  <script>
+  (() => {
+    const canvas = document.getElementById('game');
+    const ctx    = canvas.getContext('2d');
+    // internal resolution
+    const W = 600, H = 200;
+    canvas.width  = W;
+    canvas.height = H;
+
+    // load sprite sheet
+    const sprite = new Image();
+    sprite.src = 'assets/mario-sprite.png';
+
+    // Mario state
+    const MARIO_W = 32, MARIO_H = 32;
+    let marioY = H - MARIO_H - 10,
+        vy     = 0,
+        onGround = true,
+        frame  = 0,
+        frameTimer = 0;
+
+    // obstacles
+    const obstacles = [];
+    let spawnTimer = 0;
+
+    // controls
+    window.addEventListener('keydown', e => {
+      if ((e.code === 'Space' || e.code === 'ArrowUp') && onGround) {
+        vy = -8;
+        onGround = false;
+      }
+    });
+
+    function update() {
+      // physics
+      vy += 0.5; // gravity
+      marioY += vy;
+      if (marioY > H - MARIO_H - 10) {
+        marioY = H - MARIO_H - 10;
+        vy = 0;
+        onGround = true;
+      }
+
+      // animate run frames if on ground
+      if (onGround) {
+        frameTimer++;
+        if (frameTimer > 5) {
+          frame = (frame + 1) % 3; // frames 0–2
+          frameTimer = 0;
+        }
+      } else {
+        frame = 3; // jump frame
+      }
+
+      // spawn obstacles
+      spawnTimer++;
+      if (spawnTimer > 90 + Math.random() * 60) {
+        obstacles.push({ x: W, w: 20 + Math.random()*10, h: 20 + Math.random()*20 });
+        spawnTimer = 0;
+      }
+      // move and cull obstacles
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        obstacles[i].x -= 4;
+        if (obstacles[i].x + obstacles[i].w < 0) obstacles.splice(i,1);
+      }
+
+      // collision?
+      for (let o of obstacles) {
+        if (o.x < 50+MARIO_W && o.x+o.w > 50 &&
+            marioY+MARIO_H > H - 10 - o.h) {
+          // game over
+          cancelAnimationFrame(loopId);
+          ctx.fillStyle = 'rgba(0,0,0,0.5)';
+          ctx.fillRect(0,0,W,H);
+          ctx.fillStyle = '#f00';
+          ctx.font = '30px sans-serif';
+          ctx.fillText('Game Over', W/2 - 80, H/2);
+        }
+      }
+    }
+
+    function draw() {
+      // clear
+      ctx.clearRect(0,0,W,H);
+
+      // ground
+      ctx.fillStyle = '#654321';
+      ctx.fillRect(0, H-10, W, 10);
+
+      // draw Mario frame
+      ctx.drawImage(
+        sprite,
+        frame * MARIO_W, 0,
+        MARIO_W, MARIO_H,
+        50, marioY,
+        MARIO_W, MARIO_H
+      );
+
+      // draw obstacles
+      ctx.fillStyle = '#0a0';
+      for (let o of obstacles) {
+        ctx.fillRect(o.x, H - 10 - o.h, o.w, o.h);
+      }
+    }
+
+    let loopId;
+    function loop() {
+      update();
+      draw();
+      loopId = requestAnimationFrame(loop);
+    }
+
+    sprite.onload = () => loop();
+  })();
+  </script>
+</body>
+</html>
