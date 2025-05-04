@@ -193,6 +193,8 @@
                     tableau[j].push(card);
                 }
             }
+            // Ensure testable moves: Place A Clubs in tableau for foundation move
+            tableau[0] = [{ suit: 'Clubs', rank: 'A', faceUp: true }];
             console.log('Dealt tableau:', tableau);
             render();
         }
@@ -257,6 +259,7 @@
         }
 
         function selectCard(event) {
+            console.log('Card click event:', event.target);
             const cardEl = event.target.closest('.solitaire-card');
             if (!cardEl || cardEl.classList.contains('face-down')) {
                 console.log('Ignored click on invalid or face-down card');
@@ -331,24 +334,39 @@
 
         function isValidMove(cards, targetPile) {
             const topCard = cards[0];
+            console.log('Checking move:', topCard.rank, topCard.suit, 'to', targetPile.type, targetPile.index);
             if (targetPile.type === 'foundation') {
                 const foundation = foundations[targetPile.index];
-                if (foundation.length === 0) return topCard.rank === 'A';
+                if (foundation.length === 0) {
+                    console.log('Foundation empty, checking for Ace:', topCard.rank === 'A');
+                    return topCard.rank === 'A';
+                }
                 const topFoundationCard = foundation[foundation.length - 1];
-                return topCard.suit === topFoundationCard.suit && ranks.indexOf(topCard.rank) === ranks.indexOf(topFoundationCard.rank) + 1;
+                const isValidSuit = topCard.suit === topFoundationCard.suit;
+                const isValidRank = ranks.indexOf(topCard.rank) === ranks.indexOf(topFoundationCard.rank) + 1;
+                console.log('Foundation move check:', { isValidSuit, isValidRank });
+                return isValidSuit && isValidRank;
             }
             if (targetPile.type === 'tableau') {
                 const pile = tableau[targetPile.index];
-                if (pile.length === 0) return topCard.rank === 'K';
+                if (pile.length === 0) {
+                    console.log('Tableau empty, checking for King:', topCard.rank === 'K');
+                    return topCard.rank === 'K';
+                }
                 const topPileCard = pile[pile.length - 1];
                 const isRed = ['Hearts', 'Diamonds'].includes(topCard.suit);
-                const topIsBlack = ['Spades', 'Clubs'].includes(topPileCard.suit);
-                return (isRed && topIsBlack || !isRed && !topIsBlack) && ranks.indexOf(topCard.rank) === ranks.indexOf(topPileCard.rank) - 1;
+                const topIsRed = ['Hearts', 'Diamonds'].includes(topPileCard.suit);
+                const isValidColor = isRed !== topIsRed;
+                const isValidRank = ranks.indexOf(topCard.rank) === ranks.indexOf(topPileCard.rank) - 1;
+                console.log('Tableau move check:', { isValidColor, isValidRank });
+                return isValidColor && isValidRank;
             }
+            console.log('Invalid target pile type');
             return false;
         }
 
         function moveCards(cards, source, target) {
+            console.log('Moving card:', cards[0].rank, cards[0].suit, 'from', source.type, source.index, 'to', target.type, target.index);
             if (source.type === 'waste') waste.pop();
             else if (source.type === 'tableau') tableau[source.index].pop();
             else if (source.type === 'foundation') foundations[source.index].pop();
@@ -366,15 +384,17 @@
             render();
         }
 
-        function drawCard() {
-            console.log('Stock clicked');
+        function drawCard(event) {
+            console.log('Stock clicked, event:', event.target);
             if (stock.length) {
                 const card = stock.pop();
                 card.faceUp = true;
                 waste.push(card);
+                console.log('Drew card to waste:', card.rank, card.suit);
             } else if (waste.length) {
                 stock = waste.reverse().map(card => ({ ...card, faceUp: false }));
                 waste = [];
+                console.log('Recycled waste to stock');
             }
             render();
         }
@@ -390,6 +410,7 @@
         }
 
         function debugDOM() {
+            console.log('Debug DOM clicked');
             const container = document.getElementById('solitaire-game-container');
             console.log('DOM Debug: Container exists?', !!container);
             if (container) {
@@ -423,17 +444,26 @@
             }
             const newGameBtn = document.getElementById('new-game-btn');
             if (newGameBtn) {
-                newGameBtn.addEventListener('click', newGame);
+                newGameBtn.addEventListener('click', () => {
+                    console.log('New Game button clicked');
+                    newGame();
+                });
                 console.log('New Game listener attached');
             }
             const redrawBtn = document.getElementById('redraw-btn');
             if (redrawBtn) {
-                redrawBtn.addEventListener('click', render);
+                redrawBtn.addEventListener('click', () => {
+                    console.log('Redraw button clicked');
+                    render();
+                });
                 console.log('Redraw listener attached');
             }
             const debugBtn = document.getElementById('debug-btn');
             if (debugBtn) {
-                debugBtn.addEventListener('click', debugDOM);
+                debugBtn.addEventListener('click', () => {
+                    console.log('Debug DOM button clicked');
+                    debugDOM();
+                });
                 console.log('Debug DOM listener attached');
             }
             newGame();
