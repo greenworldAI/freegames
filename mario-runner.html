@@ -31,23 +31,21 @@
     canvas.width  = W;
     canvas.height = H;
 
-    // load sprite sheet (must be at assets/mario-sprite.png)
+    // load single-sprite Mario
     const sprite = new Image();
     sprite.src = 'assets/mario-sprite.png';
 
-    // Mario state
-    const MARIO_W = 32, MARIO_H = 32;
-    let marioY = H - MARIO_H - 10,
-        vy     = 0,
-        onGround = true,
-        frame  = 0,
-        frameTimer = 0;
+    // Mario dimensions (scaled)
+    const MARIO_W = 64, MARIO_H = 64;
+    let marioY    = H - MARIO_H - 10,
+        vy        = 0,
+        onGround  = true;
 
     // obstacles
     const obstacles = [];
     let spawnTimer = 0;
 
-    // controls
+    // jump control
     window.addEventListener('keydown', e => {
       if ((e.code === 'Space' || e.code === 'ArrowUp') && onGround) {
         vy = -8;
@@ -56,24 +54,13 @@
     });
 
     function update() {
-      // physics
-      vy += 0.5; // gravity
+      // gravity & ground collision
+      vy += 0.5;
       marioY += vy;
       if (marioY > H - MARIO_H - 10) {
         marioY = H - MARIO_H - 10;
         vy = 0;
         onGround = true;
-      }
-
-      // animate run frames if on ground
-      if (onGround) {
-        frameTimer++;
-        if (frameTimer > 5) {
-          frame = (frame + 1) % 3; // frames 0–2
-          frameTimer = 0;
-        }
-      } else {
-        frame = 3; // jump frame
       }
 
       // spawn obstacles
@@ -86,7 +73,8 @@
         });
         spawnTimer = 0;
       }
-      // move and cull obstacles
+
+      // move & remove off-screen
       for (let i = obstacles.length - 1; i >= 0; i--) {
         obstacles[i].x -= 4;
         if (obstacles[i].x + obstacles[i].w < 0) {
@@ -94,7 +82,7 @@
         }
       }
 
-      // collision?
+      // collision detection
       for (let o of obstacles) {
         if (
           o.x < 50 + MARIO_W &&
@@ -113,20 +101,18 @@
     }
 
     function draw() {
-      // clear
+      // clear canvas
       ctx.clearRect(0, 0, W, H);
 
       // ground
       ctx.fillStyle = '#654321';
       ctx.fillRect(0, H - 10, W, 10);
 
-      // draw Mario frame
+      // draw Mario sprite, scaled
       ctx.drawImage(
         sprite,
-        frame * MARIO_W, 0,
-        MARIO_W, MARIO_H,
-        50, marioY,
-        MARIO_W, MARIO_H
+        0, 0, sprite.width, sprite.height,
+        50, marioY, MARIO_W, MARIO_H
       );
 
       // draw obstacles
@@ -143,6 +129,7 @@
       loopId = requestAnimationFrame(loop);
     }
 
+    // start game when sprite is loaded
     sprite.onload = () => loop();
   })();
   </script>
