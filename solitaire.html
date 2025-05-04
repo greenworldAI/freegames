@@ -20,12 +20,13 @@
       gap: 8px;
       margin-top: 12px;
     }
+    /* show empty slots clearly */
     .slot, .pile {
       flex: 1;
       position: relative;
       aspect-ratio: 5/7;
-      background: #1a2a3a;             /* lighter than page */
-      border: 2px dashed #555;        /* dashed border to show slot */
+      background: #1a2a3a;
+      border: 2px dashed #555;
       border-radius: 4px;
       overflow: hidden;
     }
@@ -34,20 +35,27 @@
       left: 0;
       width: 100%;
       aspect-ratio: 5/7;
-      border: 1px solid #444;
       border-radius: 4px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: bold;
       user-select: none;
       cursor: pointer;
     }
+    /* striped back pattern */
     .card.back {
-      background: #333;
+      background: #eee;
+      background-image:
+        repeating-linear-gradient(
+          45deg,
+          #ccc, #ccc 2px,
+          #eee 2px, #eee 4px
+        );
+      border: 1px solid #aaa;
     }
     .card.face {
       background: #fff;
+      border: 1px solid #444;
     }
   </style>
 </head>
@@ -55,8 +63,8 @@
 
   <div id="sol-container">
     <div id="sol-top">
-      <div id="stock"     class="slot"></div>
-      <div id="waste"     class="slot"></div>
+      <div id="stock" class="slot"></div>
+      <div id="waste" class="slot"></div>
       <div class="slot foundation" data-suit="♠"></div>
       <div class="slot foundation" data-suit="♥"></div>
       <div class="slot foundation" data-suit="♦"></div>
@@ -92,7 +100,7 @@
     function createDeck(){
       const d=[];
       for(let s of suits) for(let r of ranks)
-        d.push({suit:s,rank:r,color:(s==='♥'||s==='♦')?'red':'black',faceUp:false});
+        d.push({ suit:s, rank:r, color:(s==='♥'||s==='♦')?'red':'black', faceUp:false });
       return d;
     }
 
@@ -119,7 +127,6 @@
       foundations={'♠':[],'♥':[],'♦':[],'♣':[]};
       tableau=[[],[],[],[],[],[],[]];
       selected=null;
-
       let deck=createDeck();
       shuffle(deck);
       let idx=0;
@@ -136,7 +143,7 @@
     }
 
     function render(){
-      // clear
+      // clear UI
       stockEl.innerHTML=''; wasteEl.innerHTML='';
       document.querySelectorAll('.foundation, .pile')
               .forEach(el=>el.innerHTML='');
@@ -144,7 +151,7 @@
       // STOCK
       if(stock.length){
         const b=document.createElement('div');
-        b.className='card back'; b.style.top='0';
+        b.className='card back'; b.style.top='0'; b.style.zIndex=0;
         b.addEventListener('click',handleStock);
         stockEl.appendChild(b);
       }
@@ -154,10 +161,9 @@
       if(waste.length){
         const top=waste[waste.length-1];
         const c=document.createElement('div');
-        c.className='card face';
-        c.textContent=top.rank+top.suit;
-        c.style.top   ='0';
-        c.style.color =top.color==='red'? '#d00':'#000';
+        c.className='card face'; c.textContent=top.rank+top.suit;
+        c.style.top='0'; c.style.zIndex=0;
+        c.style.color=top.color==='red'? '#d00':'#000';
         wasteEl.appendChild(c);
       }
       wasteEl.onclick=()=>{
@@ -172,21 +178,17 @@
                 c=document.createElement('div');
           c.className='card face';
           c.textContent=top.rank+top.suit;
-          c.style.top    ='0';
-          c.style.color  =top.color==='red'? '#d00':'#000';
+          c.style.top='0'; c.style.zIndex=0;
+          c.style.color=top.color==='red'? '#d00':'#000';
           el.appendChild(c);
         }
         el.onclick=()=>{
           if(!selected) return;
           const dest=foundations[suit]||[];
-          let card;
-          if(selected.type==='waste') card=waste[waste.length-1];
-          else {
-            const {pi,ci}=selected;
-            if(ci!==tableau[pi].length-1) return;
-            card=tableau[pi][ci];
-          }
-          if(card&&card.suit===suit&&order.indexOf(card.rank)===dest.length){
+          let card = selected.type==='waste'
+                     ? waste[waste.length-1]
+                     : tableau[selected.pi][selected.ci];
+          if(card && card.suit===suit && order.indexOf(card.rank)===dest.length){
             dest.push(card);
             if(selected.type==='waste') waste.pop();
             else tableau[selected.pi].pop();
@@ -195,18 +197,18 @@
         };
       });
 
-      // TABLEAU
+      // TABLEAU with dynamic overlap & layering
       pileEls.forEach(el=>{
         const idx=parseInt(el.dataset.index,10),
-              pileArr=tableau[idx]||[];
-        // compute dynamic overlap & font-size
-        const h=el.clientHeight,
+              pileArr=tableau[idx]||[],
+              h=el.clientHeight,
               overlap=h*0.2,
               fs=h*0.3+'px';
         pileArr.forEach((card,ci)=>{
           const c=document.createElement('div');
           c.className='card '+(card.faceUp?'face':'back');
           c.style.top=(ci*overlap)+'px';
+          c.style.zIndex=ci;
           if(card.faceUp){
             c.textContent=card.rank+card.suit;
             c.style.color=card.color==='red'? '#d00':'#000';
@@ -217,6 +219,7 @@
           c.dataset.ci=ci;
           el.appendChild(c);
         });
+
         el.onclick=e=>{
           const t=e.target;
           if(t.classList.contains('card')&&t.classList.contains('face')){
@@ -227,14 +230,14 @@
             }
           } else if(selected){
             const dest=tableau[idx]||[];
-            let card=(selected.type==='waste')
-                     ? waste[waste.length-1]
-                     : tableau[selected.pi][selected.ci];
+            let card = selected.type==='waste'
+                       ? waste[waste.length-1]
+                       : tableau[selected.pi][selected.ci];
             const top=dest[dest.length-1],
                   ciCard=order.indexOf(card.rank),
-                  ciTop=top?order.indexOf(top.rank):-1;
-            if((!top&&card.rank==='K')||
-               (top&&ciTop===ciCard+1&&top.color!==card.color)){
+                  ciTop = top? order.indexOf(top.rank): -1;
+            if((!top && card.rank==='K') ||
+               (top && ciTop===ciCard+1 && top.color!==card.color)){
               dest.push(card);
               if(selected.type==='waste') waste.pop();
               else tableau[selected.pi].pop();
