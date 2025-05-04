@@ -7,12 +7,12 @@
   <style>
     body {
       margin: 0; padding: 0;
-      display: flex; justify-content: center;
+      display: flex; flex-direction: column;
+      align-items: center;
       background: #0a1f3a;
       font-family: sans-serif;
     }
     #game-container {
-      position: relative;
       width: clamp(300px, 90vw, 600px);
     }
     canvas {
@@ -21,26 +21,25 @@
       background: #5c94fc; /* sky */
       touch-action: none;  /* prevent scroll on mobile */
       display: block;
+      border: 2px solid #333;
+      border-radius: 8px;
     }
     #restart {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      padding: 6px 12px;
+      margin-top: 12px;
+      padding: 8px 16px;
       background: #fff;
       color: #000;
       border: none;
       border-radius: 4px;
       cursor: pointer;
-      font-size: 14px;
-      z-index: 10;
+      font-size: 16px;
     }
   </style>
 </head>
 <body>
   <div id="game-container">
-    <button id="restart">Restart</button>
     <canvas id="game"></canvas>
+    <button id="restart">Restart</button>
   </div>
   <script>
   (()=>{
@@ -55,23 +54,20 @@
     sprite.src   = 'https://greenworldai.github.io/freegames/assets/mario-sprite.png';
 
     const MARIO_W  = 64, MARIO_H = 64, START_X = 50;
-    let marioY    = H - MARIO_H - 10,
-        vy        = 0,
-        onGround  = true,
-        gameOver  = false,
-        obstacles = [],
-        spawnTimer = 0,
-        obstacleSpeed = 4,
-        loopId;
+    let marioY, vy, onGround, gameOver, obstacles, spawnTimer, obstacleSpeed, loopId;
+
+    function resetState() {
+      marioY        = H - MARIO_H - 10;
+      vy            = 0;
+      onGround      = true;
+      gameOver      = false;
+      obstacles     = [];
+      spawnTimer    = 0;
+      obstacleSpeed = 4;
+    }
 
     function resetGame() {
-      gameOver = false;
-      marioY = H - MARIO_H - 10;
-      vy = 0;
-      onGround = true;
-      obstacles.length = 0;
-      spawnTimer = 0;
-      obstacleSpeed = 4;
+      resetState();
       cancelAnimationFrame(loopId);
       loop();
     }
@@ -87,45 +83,33 @@
     window.addEventListener('keydown', e => {
       if (e.code === 'Space' || e.code === 'ArrowUp') doJump();
     });
-    canvas.addEventListener('mousedown', doJump);
+    canvas.addEventListener('mousedown',  doJump);
     canvas.addEventListener('touchstart', e => { e.preventDefault(); doJump(); });
 
     function update() {
       if (gameOver) return;
 
-      // gravity & ground
       vy += 0.5;
       marioY += vy;
       if (marioY > H - MARIO_H - 10) {
-        marioY = H - MARIO_H - 10;
-        vy = 0;
+        marioY   = H - MARIO_H - 10;
+        vy       = 0;
         onGround = true;
       }
 
-      // spawn obstacles faster
       spawnTimer++;
-      const threshold = 60 + Math.random() * 30;
-      if (spawnTimer > threshold) {
-        obstacles.push({
-          x: W,
-          w: 20 + Math.random() * 10,
-          h: 20 + Math.random() * 20
-        });
+      if (spawnTimer > 90 + Math.random() * 60) {
+        obstacles.push({ x: W, w: 20 + Math.random()*10, h: 20 + Math.random()*20 });
         spawnTimer = 0;
       }
 
-      // increase speed over time
-      obstacleSpeed += 0.0005;
+      obstacleSpeed += 0.001;
 
-      // move & cull
       for (let i = obstacles.length - 1; i >= 0; i--) {
         obstacles[i].x -= obstacleSpeed;
-        if (obstacles[i].x + obstacles[i].w < 0) {
-          obstacles.splice(i, 1);
-        }
+        if (obstacles[i].x + obstacles[i].w < 0) obstacles.splice(i,1);
       }
 
-      // collision
       const marioBottom = marioY + MARIO_H;
       for (const o of obstacles) {
         const obsTop = H - 10 - o.h;
@@ -141,22 +125,22 @@
     }
 
     function draw() {
-      ctx.clearRect(0, 0, W, H);
+      ctx.clearRect(0,0,W,H);
+
       // ground
       ctx.fillStyle = '#654321';
       ctx.fillRect(0, H - 10, W, 10);
+
       // Mario
-      ctx.drawImage(
-        sprite,
-        0, 0, sprite.width, sprite.height,
-        START_X, marioY, MARIO_W, MARIO_H
-      );
+      ctx.drawImage(sprite, 0,0, sprite.width, sprite.height,
+                    START_X, marioY, MARIO_W, MARIO_H);
+
       // obstacles
       ctx.fillStyle = '#0a0';
       for (const o of obstacles) {
         ctx.fillRect(o.x, H - 10 - o.h, o.w, o.h);
       }
-      // game over overlay
+
       if (gameOver) {
         ctx.fillStyle = 'rgba(0,0,0,0.5)';
         ctx.fillRect(0,0,W,H);
@@ -172,8 +156,10 @@
       if (!gameOver) loopId = requestAnimationFrame(loop);
     }
 
-    // start
-    loop();
+    // initialize and start
+    resetState();
+    sprite.onload = () => loop();
+    sprite.onerror = () => loop();
   })();
   </script>
 </body>
