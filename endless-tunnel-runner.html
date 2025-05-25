@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Endless Tunnel Runner (Collision Fixed)</title>
+  <title>Endless Tunnel Runner (Visible Tunnel)</title>
   <style>
     body { margin: 0; overflow: hidden; background: #000; }
     #game-wrapper {
@@ -23,7 +23,10 @@
       align-items: center;
       box-sizing: border-box;
     }
-    #game-container { width: 100%; height: 500px; }
+    #game-container {
+      width: 100%;
+      height: 500px;
+    }
     #message-overlay {
       position: absolute; top: 0; left: 0;
       width: 100%; height: 100%;
@@ -83,9 +86,7 @@
     const SPEED       = 0.15;
     let distance      = 0;
     let highscore     = 0;
-
-    // Boxes for collision
-    let cameraBox, tempBox;
+    let cameraBox;
 
     function loadHigh(){
       highscore = parseFloat(localStorage.getItem('tunnelHigh')) || 0;
@@ -120,23 +121,23 @@
       container.innerHTML = '';
       container.appendChild(renderer.domElement);
 
-      // Build tunnel
+      // Tunnel: cylinder segments with Inside facing
       tunnel = [];
-      const geo = new THREE.TorusGeometry(TUNNEL_RAD, 0.5, 8, 100);
+      const geo = new THREE.CylinderGeometry(TUNNEL_RAD, TUNNEL_RAD, SEG_SPACING, 16, 1, true);
       geo.rotateX(Math.PI/2);
-      const mat = new THREE.MeshBasicMaterial({color:0x4444ff, wireframe:true});
-      for(let i=0;i<SEG_COUNT;i++){
+      const mat = new THREE.MeshBasicMaterial({color:0x4444ff, side: THREE.BackSide});
+      for(let i=0; i<SEG_COUNT; i++){
         const seg = new THREE.Mesh(geo, mat);
-        seg.position.z = -i*SEG_SPACING;
+        seg.position.z = -(i+1)*SEG_SPACING;
         scene.add(seg);
         tunnel.push(seg);
       }
 
-      // Build obstacles
+      // Obstacles
       obstacles = [];
       const boxGeo = new THREE.BoxGeometry(1,1,1);
       const boxMat = new THREE.MeshBasicMaterial({color:0xff4444});
-      for(let i=0;i<OBST_COUNT;i++){
+      for(let i=0; i<OBST_COUNT; i++){
         const b = new THREE.Mesh(boxGeo, boxMat);
         b.userData.box = new THREE.Box3();
         resetObstacle(b);
@@ -144,7 +145,7 @@
         obstacles.push(b);
       }
 
-      // Prepare camera box
+      // Camera collision box (1×1×1)
       cameraBox = new THREE.Box3();
 
       window.addEventListener('resize', onResize);
@@ -153,7 +154,7 @@
     }
 
     function resetObstacle(b){
-      b.position.z = -Math.random()*SEG_COUNT*SEG_SPACING;
+      b.position.z = -Math.random() * SEG_COUNT * SEG_SPACING;
       b.position.x = (Math.random()*2-1)*(TUNNEL_RAD-1);
       b.position.y = (Math.random()*2-1)*(TUNNEL_RAD-1);
     }
@@ -166,15 +167,15 @@
 
     const keys = {};
     function setupControls(){
-      document.addEventListener('keydown', e=>{ keys[e.key]=true; });
-      document.addEventListener('keyup',   e=>{ keys[e.key]=false; });
+      document.addEventListener('keydown', e=>{ keys[e.key] = true; e.preventDefault(); });
+      document.addEventListener('keyup',   e=>{ keys[e.key] = false; });
       playBtn.addEventListener('click', init);
     }
 
     function animate(){
       requestAnimationFrame(animate);
 
-      // Move tunnel segments
+      // Tunnel movement
       tunnel.forEach(seg=>{
         seg.position.z += SPEED;
         if(seg.position.z > 1){
@@ -182,23 +183,21 @@
         }
       });
 
-      // Update camera collider box (1×1×1 around camera)
+      // Update camera collision box (centered at camera)
       cameraBox.setFromCenterAndSize(
         camera.position,
         new THREE.Vector3(1,1,1)
       );
 
-      // Move obstacles, check collisions
+      // Obstacles movement & collision
       for(const o of obstacles){
         o.position.z += SPEED;
         if(o.position.z > 1) resetObstacle(o);
 
-        // Update obstacle box
         o.userData.box.setFromObject(o);
         if(cameraBox.intersectsBox(o.userData.box)){
-          // Collision!
           saveHigh();
-          showMessage(`Game Over!<br>Distance: ${Math.floor(distance)}`);
+          showMessage(`💥 Game Over!<br>Distance: ${Math.floor(distance)}`);
           return;
         }
       }
@@ -209,7 +208,7 @@
       if(keys['ArrowUp']   || keys['w'])  camera.position.y += 0.1;
       if(keys['ArrowDown'] || keys['s'])  camera.position.y -= 0.1;
 
-      // Distance update
+      // Distance
       distance += SPEED;
       distEl.textContent = Math.floor(distance);
 
@@ -221,7 +220,6 @@
       overlay.classList.add('visible');
     }
 
-    // Start
     loadHigh();
     init();
   })();
