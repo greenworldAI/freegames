@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Endless Tunnel Runner</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #000;
+    }
+    #game-wrapper {
+      position: relative;
+      width: 100%;
+      max-width: 600px;
+      margin: 1em auto 0;
+    }
+    .panel {
+      background: #0f1e33;
+      color: #fff;
+      font-family: sans-serif;
+      font-size: 1.1em;
+      padding: 8px;
+      border-radius: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-sizing: border-box;
+    }
+    #game-container {
+      width: 100%;
+      height: 500px;
+      display: block;
+    }
+    #message-overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      font-family: sans-serif;
+      font-size: 1.4em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      border-radius: 8px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    #message-overlay.visible {
+      pointer-events: all;
+      opacity: 1;
+    }
+    #message-overlay button {
+      margin-top: 1em;
+      padding: 8px 16px;
+      font-size: 1em;
+      background: #444;
+      border: none;
+      color: #fff;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    #message-overlay button:hover {
+      background: #555;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="game-wrapper">
+    <!-- Score Panel -->
+    <div class="panel">
+      <div>Distance: <span id="distance">0</span></div>
+      <div>High Score: <span id="highscore">0</span></div>
+    </div>
+
+    <!-- Three.js will inject its canvas here -->
+    <div id="game-container"></div>
+
+    <!-- Win/Lose message -->
+    <div id="message-overlay">
+      <div id="message-text"></div>
+      <button id="play-again">Play Again</button>
+    </div>
+  </div>
+
+  <!-- Three.js from CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
+  <script>
+  (function(){
+    // --- Setup scene, camera, renderer ---
+    const container = document.getElementById('game-container');
+    const overlay   = document.getElementById('message-overlay');
+    const msgText   = document.getElementById('message-text');
+    const playBtn   = document.getElementById('play-again');
+    const distEl    = document.getElementById('distance');
+    const highEl    = document.getElementById('highscore');
+
+    let scene, camera, renderer;
+    let tunnel = [], obstacles = [];
+    const SEG_COUNT    = 50;
+    const SEG_SPACING  = 2;
+    const TUNNEL_RAD   = 10;
+    const OBST_COUNT   = 30;
+    const SPEED        = 0.15;
+    let distance       = 0;
+    let highscore      = 0;
+    const size         = 4; // for obstacle random positions
+
+    // Load high score
+    function loadHigh(){
+      highscore = parseFloat(localStorage.getItem('tunnelHigh')) || 0;
+      highEl.textContent = Math.floor(highscore);
+    }
+    // Save high score
+    function saveHigh(){
+      if(distance > highscore){
+        highscore = distance;
+        localStorage.setItem('tunnelHigh', highscore);
+        highEl.textContent = Math.floor(highscore);
+      }
+    }
+
+    function init(){
+      // reset
+      distance = 0;
+      distEl.textContent = '0';
+      overlay.classList.remove('visible');
+
+      // Scene & camera
+      scene = new THREE.Scene();
+      camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+      camera.position.set(0,0,0);
+
+      // Renderer
+      if(renderer) renderer.dispose();
+      renderer = new THREE.WebGLRenderer({antialias:true});
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      container.innerHTML = '';
+      container.appendChild(renderer.domElement);
+
+      // Build tunnel segments
+      tunnel = [];
+      const geo = new THREE.TorusGeometry(TUNNEL_RAD, 0.5, 8, 100);
+      geo.rotateX(Math.PI/2);
+      const mat = new THREE.MeshBasicMaterial({color:0x4444ff, wireframe:true});
+      for(let i=0;i<SEG_COUNT;i++){
+        const m = new THREE.Mesh(geo, mat);
+        m.position.z = -i*SEG_SPACING;
+        scene.add(m);
+        tunnel.push(m);
+      }
+
+      // Build obstacles
+      obstacles = [];
+      const boxGeo = new THREE.BoxGeometry(1,1,1);
+      const boxMat = new THREE.MeshBasicMaterial({color:0xff4444});
+      for(let i=0;i<OBST_COUNT;i++){
+        const b = new THREE.Mesh(boxGeo, boxMat);
+        resetObstacle(b);
+        scene.add(b);
+        obstacles.push(b);
+      }
+
+      window.addEventListener('resize', onResize);
+      document.addEventListener('keydown', onKey);
+      playLoop();
+    }
+
+    function resetObstacle(b){
+      b.position.z = -Math.random()*SEG_COUNT*SEG_SPACING;
+      b.position.x = (Math.random()*2-1)*(TUNNEL_RAD-1);
+      b.position.y = (Math.random()*2-1)*(TUNNEL_RAD-1);
+    }
+
+    function onResize(){
+      camera.aspect = container.clientWidth/container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth,container.clientHeight);
+    }
+
+    const keys = {};
+    function onKey(e){
+      keys[e.key] = (e.type==='keydown');
+    }
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('keyup', e=>{ keys[e.key]=false; });
+
+    function playLoop(){
+      requestAnimationFrame(playLoop);
+
+      // advance tunnel
+      tunnel.forEach(seg=>{
+        seg.position.z += SPEED;
+        if(seg.position.z > 1){
+          seg.position.z -= SEG_COUNT * SEG_SPACING;
+        }
+      });
+
+      // move obstacles & check collision
+      obstacles.forEach(o=>{
+        o.position.z += SPEED;
+        if(o.position.z > 1){
+          resetObstacle(o);
+        }
+        // collision test
+        const dx = o.position.x - camera.position.x;
+        const dy = o.position.y - camera.position.y;
+        const dz = o.position.z - camera.position.z;
+        if(Math.sqrt(dx*dx+dy*dy+dz*dz) < 1){
+          // game over
+          saveHigh();
+          showMessage(`Game Over!<br>Distance: ${Math.floor(distance)}`);
+          return;
+        }
+      });
+
+      // camera steering
+      if(keys['ArrowLeft']||keys['a'])  camera.position.x -= 0.1;
+      if(keys['ArrowRight']||keys['d']) camera.position.x += 0.1;
+      if(keys['ArrowUp']||keys['w'])    camera.position.y += 0.1;
+      if(keys['ArrowDown']||keys['s'])  camera.position.y -= 0.1;
+
+      // update distance
+      distance += SPEED;
+      distEl.textContent = Math.floor(distance);
+
+      renderer.render(scene, camera);
+    }
+
+    function showMessage(html){
+      msgText.innerHTML = html;
+      overlay.classList.add('visible');
+    }
+
+    playBtn.addEventListener('click', init);
+
+    // start
+    loadHigh();
+    init();
+
+  })();
+  </script>
+</body>
+</html>
