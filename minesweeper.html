@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Free Online Minesweeper</title>
+  <style>
+    /* ===== Styles from the standalone file ===== */
+    #minesweeper-container {
+      width:100%; max-width:400px; margin:20px auto;
+      background:#121212; border:1px solid #333;
+      border-radius:4px; padding:8px;
+      box-sizing:border-box; font-family:sans-serif; color:#eee;
+      position:relative;
+    }
+    #minesweeper-info {
+      display:flex; justify-content:space-between;
+      align-items:center; margin-bottom:8px; gap:8px;
+      font-size:14px;
+    }
+    #minesweeper-info select {
+      background:#1e1e1e; color:#eee;
+      border:1px solid #333; border-radius:4px;
+      padding:4px 6px; font-size:14px;
+    }
+    #minesweeper-grid {
+      display:grid; gap:1px; background:#333;
+    }
+    #minesweeper-grid > div {
+      background:#1e1e1e; border:1px solid #333;
+      display:flex; align-items:center; justify-content:center;
+      cursor:pointer; user-select:none; aspect-ratio:1;
+      font-size:calc(12px + 0.5vw);
+    }
+    #minesweeper-controls {
+      margin-top:8px; font-size:14px; color:#aaa;
+      text-align:center;
+    }
+    #restart-button {
+      margin-top:8px; width:100%; padding:8px;
+      background:#333; color:#eee; border:none;
+      border-radius:4px; cursor:pointer; font-size:16px;
+    }
+    #restart-button:hover { background:#444; }
+    #overlay {
+      position:absolute; top:0; left:0;
+      width:100%; height:100%; display:none;
+      background:rgba(0,0,0,0.85); color:#fff;
+      align-items:center; justify-content:center;
+      flex-direction:column; text-align:center;
+      z-index:10; font-size:18px;
+    }
+    #overlay button {
+      margin-top:12px; padding:8px 16px;
+      font-size:16px; cursor:pointer;
+      background:#444; color:#eee; border:none;
+      border-radius:4px;
+    }
+    #overlay button:hover { background:#555; }
+  </style>
+</head>
+<body>
+
+  <div id="minesweeper-container">
+    <div id="minesweeper-info">
+      <label>
+        Difficulty:
+        <select id="difficulty">
+          <option value="10,10,15">Beginner (10×10, 15)</option>
+          <option value="16,16,40">Intermediate (16×16, 40)</option>
+          <option value="24,24,99">Expert (24×24, 99)</option>
+        </select>
+      </label>
+      <div>Time: <span id="timer">0s</span></div>
+      <div>Best: <span id="best-time">&mdash;</span></div>
+      <div>Flags: <span id="flags-remaining">0</span></div>
+    </div>
+
+    <div id="minesweeper-grid"></div>
+
+    <div id="minesweeper-controls">
+      Left-click: Reveal  |  Right-click (long-press on touch): Flag
+    </div>
+
+    <button id="restart-button">Restart</button>
+
+    <div id="overlay">
+      <div id="overlay-msg"></div>
+      <button id="overlay-btn">Play Again</button>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    const gridEl     = document.getElementById('minesweeper-grid'),
+          timerEl    = document.getElementById('timer'),
+          bestEl     = document.getElementById('best-time'),
+          flagsEl    = document.getElementById('flags-remaining'),
+          diffSel    = document.getElementById('difficulty'),
+          restartBtn = document.getElementById('restart-button'),
+          overlay    = document.getElementById('overlay'),
+          overlayBtn = document.getElementById('overlay-btn'),
+          msgEl      = document.getElementById('overlay-msg');
+
+    let rows, cols, bombs,
+        grid, cells,
+        flagsPlaced, revealedCount,
+        startTime, timerInterval,
+        bestTime = parseInt(localStorage.getItem('minesweeperBestTime')),
+        timerRunning = false;
+
+    if (isNaN(bestTime)) bestTime = null;
+    function updateBest(){
+      bestEl.textContent = bestTime===null ? '—' : bestTime+'s';
+    }
+
+    function startTimer(){
+      if (timerRunning) return;
+      timerRunning = true;
+      startTime = Date.now();
+      timerInterval = setInterval(()=>{
+        timerEl.textContent = Math.floor((Date.now()-startTime)/1000)+'s';
+      },200);
+    }
+    function stopTimer(){
+      timerRunning=false;
+      clearInterval(timerInterval);
+    }
+
+    function init(){
+      stopTimer();
+      timerEl.textContent='0s';
+      flagsPlaced=0; revealedCount=0;
+      overlay.style.display='none';
+      timerRunning=false;
+      updateBest();
+
+      [rows, cols, bombs] = diffSel.value.split(',').map(Number);
+      flagsEl.textContent = bombs;
+
+      gridEl.innerHTML=''; grid=[]; cells=[];
+      gridEl.style.gridTemplateColumns=`repeat(${cols},1fr)`;
+
+      // build grid data
+      for(let r=0;r<rows;r++){
+        grid[r]=[];
+        for(let c=0;c<cols;c++){
+          grid[r][c]={bomb:false,count:0,revealed:false,flagged:false};
+        }
+      }
+      // place bombs
+      let placed=0;
+      while(placed<bombs){
+        const r=Math.floor(Math.random()*rows),
+              c=Math.floor(Math.random()*cols);
+        if(!grid[r][c].bomb){
+          grid[r][c].bomb=true;
+          placed++;
+        }
+      }
+      // neighbor counts
+      for(let r=0;r<rows;r++){
+        for(let c=0;c<cols;c++){
+          if(grid[r][c].bomb) continue;
+          let cnt=0;
+          for(let dr=-1;dr<=1;dr++){
+            for(let dc=-1;dc<=1;dc++){
+              const nr=r+dr,nc=c+dc;
+              if(nr>=0&&nr<rows&&nc>=0&&nc<cols&&grid[nr][nc].bomb) cnt++;
+            }
+          }
+          grid[r][c].count=cnt;
+        }
+      }
+      // render cells
+      for(let r=0;r<rows;r++){
+        for(let c=0;c<cols;c++){
+          const cell=document.createElement('div');
+          cell.dataset.r=r; cell.dataset.c=c;
+          gridEl.appendChild(cell);
+          cells.push(cell);
+          cell.addEventListener('click', onClick);
+          cell.addEventListener('contextmenu', onRight);
+          // touch long-press
+          let lp;
+          cell.addEventListener('touchstart',e=>{
+            e.preventDefault();
+            lp=setTimeout(()=>{ onRight.call(cell,e); lp=0; },600);
+          },{passive:false});
+          cell.addEventListener('touchend',e=>{
+            if(lp){ clearTimeout(lp); onClick.call(cell,e); }
+          });
+        }
+      }
+    }
+
+    function onClick(){
+      if(!timerRunning) startTimer();
+      const r=+this.dataset.r, c=+this.dataset.c, obj=grid[r][c];
+      if(obj.revealed||obj.flagged) return;
+      reveal(r,c);
+    }
+    function onRight(e){
+      e.preventDefault();
+      const r=+this.dataset.r, c=+this.dataset.c, obj=grid[r][c];
+      if(obj.revealed) return;
+      obj.flagged=!obj.flagged;
+      this.textContent=obj.flagged?'🚩':'';
+      flagsPlaced+=obj.flagged?1:-1;
+      flagsEl.textContent=bombs-flagsPlaced;
+    }
+    function reveal(r,c){
+      const obj=grid[r][c], idx=r*cols+c, el=cells[idx];
+      if(obj.revealed||obj.flagged) return;
+      obj.revealed=true; revealedCount++;
+      el.style.background='#2e2e2e'; el.style.cursor='default';
+      if(obj.bomb){
+        el.textContent='💣'; el.style.color='#f00';
+        return endGame(false);
+      }
+      if(obj.count>0){
+        el.textContent=obj.count;
+        const cols=['#00f','#090','#f00','#00f','#090','#f0f','#ff0','#0ff','#900'];
+        el.style.color=cols[obj.count]||'#fff';
+      } else {
+        for(let dr=-1;dr<=1;dr++){
+          for(let dc=-1;dc<=1;dc++){
+            const nr=r+dr,nc=c+dc;
+            if(nr>=0&&nr<rows&&nc>=0&&nc<cols) reveal(nr,nc);
+          }
+        }
+      }
+      if(revealedCount===rows*cols-bombs) endGame(true);
+    }
+    function endGame(win){
+      stopTimer();
+      cells.forEach((el,i)=>{
+        const r=Math.floor(i/cols), c=i%cols;
+        if(grid[r][c].bomb){
+          el.textContent='💣';
+          el.style.color='#f00';
+          el.style.background='#2e2e2e';
+        }
+        el.removeEventListener('click',onClick);
+        el.removeEventListener('contextmenu',onRight);
+      });
+      const finalTime=Math.floor((Date.now()-startTime)/1000);
+      if(win&&(bestTime===null||finalTime<bestTime)){
+        bestTime=finalTime;
+        localStorage.setItem('minesweeperBestTime',bestTime);
+      }
+      updateBest();
+      msgEl.innerHTML = win
+        ? `🎉 You cleared in ${finalTime}s!`
+        : '💥 Boom! You hit a mine!';
+      overlay.style.display='flex';
+    }
+
+    // events
+    diffSel.addEventListener('change', init);
+    restartBtn.addEventListener('click', init);
+    overlayBtn.addEventListener('click', init);
+
+    init();
+  })();
+  </script>
+</body>
+</html>
