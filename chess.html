@@ -146,7 +146,6 @@
 
     function evaluateBoard() {
       var totalEvaluation = 0;
-      // Use FEN parsing instead of game.board()
       var board = getBoardFromFEN(game.fen());
       for (var i = 0; i < 8; i++) {
         for (var j = 0; j < 8; j++) {
@@ -286,6 +285,7 @@
       onDrop: onDrop,
       onSnapEnd: onSnapEnd
     };
+    console.log('Chessboard config:', cfg); // Debug: Log the configuration
     board = Chessboard('board', cfg);
     updateStatus();
     updateMoveHistory();
