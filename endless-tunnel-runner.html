@@ -18,7 +18,9 @@
       display:flex; justify-content:space-between;
       align-items:center; box-sizing:border-box;
     }
-    #game-container { width:100%; height:500px; }
+    #game-container {
+      width:100%; height:500px;
+    }
     #message-overlay {
       position:absolute; top:0; left:0;
       width:100%; height:100%;
@@ -38,7 +40,7 @@
       border-radius:4px; cursor:pointer;
     }
     #message-overlay button:hover { background:#555 }
-    /* Fallback message styling */
+    /* fallback text if no WebGL */
     #game-container .fallback {
       color:#fff; text-align:center; padding-top:200px;
       font-family:sans-serif;
@@ -61,9 +63,10 @@
     </div>
   </div>
 
-  <script type="module">
-    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js';
-
+  <!-- load the global THREE build -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
+  <script>
+  (function(){
     const container = document.getElementById('game-container');
     const overlay   = document.getElementById('message-overlay');
     const msgText   = document.getElementById('message-text');
@@ -71,11 +74,10 @@
     const distEl    = document.getElementById('distance');
     const highEl    = document.getElementById('highscore');
 
-    // Quick WebGL support check
+    // WebGL check (global build provides WEBGL helper)
     if (!THREE.WEBGL.isWebGLAvailable()) {
-      container.innerHTML = '<div class="fallback">⚠️ WebGL not supported in this browser.</div>';
-      console.error('WebGL not supported');
-      throw new Error('WebGL not supported');
+      container.innerHTML = '<div class="fallback">⚠️ WebGL not supported</div>';
+      return;
     }
 
     let scene, camera, renderer;
@@ -86,8 +88,8 @@
           OBST_COUNT  = 30,
           SPEED       = 0.15;
     let distance  = 0,
-        highscore = 0,
-        cameraBox;
+        highscore = 0;
+    let cameraBox;
 
     function loadHigh(){
       highscore = parseFloat(localStorage.getItem('tunnelHigh')) || 0;
@@ -106,7 +108,7 @@
       distEl.textContent = '0';
       overlay.classList.remove('visible');
 
-      // Scene & Camera
+      // scene & camera
       scene = new THREE.Scene();
       camera = new THREE.PerspectiveCamera(
         75,
@@ -115,36 +117,35 @@
       );
       camera.position.set(0,0,0);
 
-      // Renderer
-      if (renderer) renderer.dispose();
+      // renderer
+      if(renderer) renderer.dispose();
       renderer = new THREE.WebGLRenderer({antialias:true});
-      renderer.setPixelRatio(window.devicePixelRatio || 1);
-      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+      renderer.setSize(container.clientWidth,container.clientHeight);
       container.innerHTML = '';
       container.appendChild(renderer.domElement);
 
-      // Build tunnel with back-facing cylinders
+      // tunnel: back‐side cylinders
       tunnel = [];
       const geo = new THREE.CylinderGeometry(
         TUNNEL_RAD, TUNNEL_RAD, SEG_SPACING, 32, 1, true
       );
       geo.rotateX(Math.PI/2);
       const mat = new THREE.MeshBasicMaterial({
-        color: 0x4444ff,
-        side: THREE.BackSide
+        color:0x4444ff, side: THREE.BackSide
       });
-      for(let i=0;i<SEG_COUNT;i++){
+      for(let i=0; i<SEG_COUNT; i++){
         const seg = new THREE.Mesh(geo, mat);
         seg.position.z = -(i+1)*SEG_SPACING;
         scene.add(seg);
         tunnel.push(seg);
       }
 
-      // Obstacles
+      // obstacles
       obstacles = [];
       const boxGeo = new THREE.BoxGeometry(1,1,1);
       const boxMat = new THREE.MeshBasicMaterial({color:0xff4444});
-      for(let i=0;i<OBST_COUNT;i++){
+      for(let i=0; i<OBST_COUNT; i++){
         const b = new THREE.Mesh(boxGeo, boxMat);
         b.userData.box = new THREE.Box3();
         resetObstacle(b);
@@ -166,26 +167,24 @@
     }
 
     function onResize(){
-      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.aspect = container.clientWidth/container.clientHeight;
       camera.updateProjectionMatrix();
-      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.setSize(container.clientWidth,container.clientHeight);
     }
 
     const keys = {};
     let tsx=0, tsy=0;
     function setupControls(){
-      // Keyboard
+      // keyboard
       window.addEventListener('keydown', e=>{
-        if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)) {
+        if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){
           e.preventDefault();
           keys[e.key] = true;
         }
       });
-      window.addEventListener('keyup', e=>{
-        keys[e.key] = false;
-      });
+      window.addEventListener('keyup', e=>{ keys[e.key] = false; });
 
-      // Touch swipe
+      // mobile swipe
       container.addEventListener('touchstart', e=>{
         tsx = e.touches[0].clientX;
         tsy = e.touches[0].clientY;
@@ -194,11 +193,11 @@
         const dx = e.changedTouches[0].clientX - tsx;
         const dy = e.changedTouches[0].clientY - tsy;
         if(Math.abs(dx)>Math.abs(dy) && Math.abs(dx)>30){
-          keys[ dx>0 ? 'ArrowRight' : 'ArrowLeft'] = true;
-          setTimeout(()=>{ keys['ArrowRight']=keys['ArrowLeft']=false; }, 100);
+          keys[ dx>0 ? 'ArrowRight' : 'ArrowLeft' ] = true;
+          setTimeout(()=>{ keys['ArrowRight']=keys['ArrowLeft']=false; },100);
         } else if(Math.abs(dy)>30){
-          keys[ dy>0 ? 'ArrowDown' : 'ArrowUp'] = true;
-          setTimeout(()=>{ keys['ArrowDown']=keys['ArrowUp']=false; }, 100);
+          keys[ dy>0 ? 'ArrowDown' : 'ArrowUp' ] = true;
+          setTimeout(()=>{ keys['ArrowDown']=keys['ArrowUp']=false; },100);
         }
       }, {passive:true});
 
@@ -208,21 +207,19 @@
     function animate(){
       requestAnimationFrame(animate);
 
-      // Scroll tunnel
+      // scroll tunnel
       tunnel.forEach(seg=>{
         seg.position.z += SPEED;
-        if(seg.position.z > 1){
-          seg.position.z -= SEG_COUNT*SEG_SPACING;
-        }
+        if(seg.position.z > 1) seg.position.z -= SEG_COUNT*SEG_SPACING;
       });
 
-      // Camera collider
+      // camera collider
       cameraBox.setFromCenterAndSize(
         camera.position,
         new THREE.Vector3(1,1,1)
       );
 
-      // Move obstacles & detect collision
+      // move & collide obstacles
       for(const o of obstacles){
         o.position.z += SPEED;
         if(o.position.z > 1) resetObstacle(o);
@@ -234,21 +231,21 @@
         }
       }
 
-      // Steering & clamp inside tunnel
+      // steering & clamp
       const step = 0.1;
       if(keys['ArrowLeft'])  camera.position.x -= step;
       if(keys['ArrowRight']) camera.position.x += step;
       if(keys['ArrowUp'])    camera.position.y += step;
       if(keys['ArrowDown'])  camera.position.y -= step;
-
       const maxOff = TUNNEL_RAD-1;
       const dx = camera.position.x, dy = camera.position.y;
       if(dx*dx + dy*dy > maxOff*maxOff){
-        const ang = Math.atan2(dy,dx);
-        camera.position.x = Math.cos(ang)*maxOff;
-        camera.position.y = Math.sin(ang)*maxOff;
+        const a = Math.atan2(dy,dx);
+        camera.position.x = Math.cos(a)*maxOff;
+        camera.position.y = Math.sin(a)*maxOff;
       }
 
+      // distance
       distance += SPEED;
       distEl.textContent = Math.floor(distance);
 
@@ -262,6 +259,7 @@
 
     loadHigh();
     init();
+  })();
   </script>
 </body>
 </html>
