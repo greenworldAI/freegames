@@ -20,6 +20,7 @@
     #board {
       width: 400px;
       margin: 0 auto 20px auto;
+      touch-action: none; /* Prevent default touch actions like scrolling */
     }
     #status, #high-score, #global-high-score {
       display: block;
@@ -199,6 +200,14 @@
       $globalHighScore.innerHTML = 'Error';
     });
 
+    // Prevent page scrolling during touch drag on the board
+    document.getElementById('board').addEventListener('touchstart', function(e) {
+      e.preventDefault(); // Prevent scrolling when starting a drag
+    });
+    document.getElementById('board').addEventListener('touchmove', function(e) {
+      e.preventDefault(); // Prevent scrolling during drag
+    });
+
     function updateLevel() {
       var level = $levelSelect.value;
       localStorage.setItem('chessLevel', level);
@@ -336,15 +345,13 @@
       var moveColor = game.turn() === 'w' ? 'White' : 'Black';
       if (game.in_checkmate()) {
         status = 'Game over, ' + moveColor + ' is in checkmate.';
-        if (moveColor === 'Black') { // Player (White) wins
+        if (moveColor === 'Black') {
           var score = Math.max(0, 1000 - (playerMoveCount * 10));
-          // Update local high score
           if (score > localHighScore) {
             localHighScore = score;
             localStorage.setItem('chessHighScore', localHighScore);
             $highScore.innerHTML = localHighScore;
           }
-          // Update global high score
           if (score > globalHighScore) {
             globalHighScore = score;
             $globalHighScore.innerHTML = globalHighScore;
