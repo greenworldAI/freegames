@@ -65,13 +65,19 @@
     }
     /* Ensure pieces are visible */
     .piece {
-      position: absolute;
-      width: 100%;
-      height: 100%;
+      position: absolute !important;
+      width: 100% !important;
+      height: 100% !important;
       background-size: contain !important;
       background-repeat: no-repeat !important;
       background-position: center !important;
-      z-index: 1;
+      z-index: 1 !important;
+      display: block !important;
+      opacity: 1 !important;
+    }
+    .square-55d63 {
+      position: relative;
+      z-index: 0;
     }
   </style>
 </head>
@@ -292,7 +298,7 @@
       draggable: true,
       position: 'start',
       pieceTheme: function(piece) {
-        var url = 'https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/alpha/' + piece + '.png';
+        var url = 'https://chessboardjs.com/img/chesspieces/merida/' + piece + '.png';
         console.log('Loading piece:', piece, 'from URL:', url); // Debug: Log piece image URLs
         return url;
       },
@@ -302,6 +308,16 @@
     };
     console.log('Chessboard config:', cfg); // Debug: Log the configuration
     board = Chessboard('board', cfg);
+
+    // Debug: Check piece elements after board initialization
+    setTimeout(function() {
+      var pieceElements = document.querySelectorAll('.piece');
+      console.log('Piece elements found:', pieceElements.length);
+      pieceElements.forEach(function(el) {
+        console.log('Piece element:', el.className, 'Style:', el.style.cssText);
+      });
+    }, 1000);
+
     updateStatus();
     updateMoveHistory();
   </script>
