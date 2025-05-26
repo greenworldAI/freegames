@@ -21,10 +21,22 @@
       width: 400px;
       margin: 0 auto 20px auto;
     }
-    #status, #high-score {
+    #status, #high-score, #global-high-score {
       display: block;
       margin: 10px 0;
       font-weight: bold;
+    }
+    #level-selector {
+      margin: 10px 0;
+    }
+    #level-selector label {
+      font-weight: bold;
+      margin-right: 10px;
+    }
+    #level-selector select {
+      padding: 5px;
+      font-size: 16px;
+      border-radius: 5px;
     }
     #move-history {
       width: 400px;
@@ -82,9 +94,18 @@
 </head>
 <body>
   <h2>Chess on Zentroll Freegames</h2>
+  <div id="level-selector">
+    <label for="level">Select Your Level:</label>
+    <select id="level" onchange="updateLevel()">
+      <option value="beginner">Beginner</option>
+      <option value="intermediate" selected>Intermediate</option>
+      <option value="pro">Pro</option>
+    </select>
+  </div>
   <div id="board"></div>
   <p>Status: <span id="status"></span></p>
-  <p>High Score: <span id="high-score">0</span></p>
+  <p>Your High Score: <span id="high-score">0</span></p>
+  <p>Global High Score: <span id="global-high-score">0</span></p>
   <button onclick="resetGame()">Reset Game</button>
   <div id="move-history">
     <h3>Move History</h3>
@@ -94,14 +115,32 @@
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.2/chess.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
   <script>
+    // Initialize Firebase
+    const firebaseConfig = {
+      apiKey: "your-api-key",
+      authDomain: "your-project-id.firebaseapp.com",
+      projectId: "your-project-id",
+      storageBucket: "your-project-id.appspot.com",
+      messagingSenderId: "your-sender-id",
+      appId: "your-app-id"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
     var board = null;
     var game = new Chess();
     console.log('game methods:', Object.keys(game));
     var $status = document.getElementById('status');
     var $highScore = document.getElementById('high-score');
+    var $globalHighScore = document.getElementById('global-high-score');
     var $moveList = document.getElementById('move-list');
-    var playerMoveCount = 0; // Track player's (white) moves
+    var $levelSelect = document.getElementById('level');
+    var playerMoveCount = 0;
+    var aiDepth = 3; // Default to Intermediate
 
     var pieceValues = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 200 };
     var pawnSquareTable = [
@@ -138,9 +177,41 @@
       20, 30, 10,  0,  0, 10, 30, 20
     ];
 
-    // Load high score from localStorage
-    var highScore = localStorage.getItem('chessHighScore') || 0;
-    $highScore.innerHTML = highScore;
+    // Load local high score and level from localStorage
+    var localHighScore = localStorage.getItem('chessHighScore') || 0;
+    $highScore.innerHTML = localHighScore;
+    var savedLevel = localStorage.getItem('chessLevel') || 'intermediate';
+    $levelSelect.value = savedLevel;
+
+    // Load global high score from Firestore
+    var globalHighScore = 0;
+    db.collection('highscores').doc('global').get().then((doc) => {
+      if (doc.exists) {
+        globalHighScore = doc.data().score;
+        $globalHighScore.innerHTML = globalHighScore;
+      } else {
+        console.log('No global high score found, setting to 0');
+        db.collection('highscores').doc('global').set({ score: 0 });
+        $globalHighScore.innerHTML = 0;
+      }
+    }).catch((error) => {
+      console.error('Error fetching global high score:', error);
+      $globalHighScore.innerHTML = 'Error';
+    });
+
+    function updateLevel() {
+      var level = $levelSelect.value;
+      localStorage.setItem('chessLevel', level);
+      if (level === 'beginner') {
+        aiDepth = 1;
+      } else if (level === 'intermediate') {
+        aiDepth = 3;
+      } else if (level === 'pro') {
+        aiDepth = 5;
+      }
+      console.log('AI depth set to:', aiDepth);
+      resetGame();
+    }
 
     function getBoardFromFEN(fen) {
       var board = [];
@@ -228,7 +299,7 @@
     }
 
     function makeAIMove() {
-      var [value, bestMove] = minimax(3, game, -Infinity, Infinity, false);
+      var [value, bestMove] = minimax(aiDepth, game, -Infinity, Infinity, false);
       if (bestMove) {
         game.move(bestMove);
         board.position(game.fen());
@@ -250,7 +321,7 @@
       });
 
       if (move === null) return 'snapback';
-      playerMoveCount++; // Increment player's move count
+      playerMoveCount++;
       window.setTimeout(makeAIMove, 250);
       updateStatus();
       updateMoveHistory();
@@ -266,11 +337,20 @@
       if (game.in_checkmate()) {
         status = 'Game over, ' + moveColor + ' is in checkmate.';
         if (moveColor === 'Black') { // Player (White) wins
-          var score = Math.max(0, 1000 - (playerMoveCount * 10)); // Calculate score
-          if (score > highScore) {
-            highScore = score;
-            localStorage.setItem('chessHighScore', highScore);
-            $highScore.innerHTML = highScore;
+          var score = Math.max(0, 1000 - (playerMoveCount * 10));
+          // Update local high score
+          if (score > localHighScore) {
+            localHighScore = score;
+            localStorage.setItem('chessHighScore', localHighScore);
+            $highScore.innerHTML = localHighScore;
+          }
+          // Update global high score
+          if (score > globalHighScore) {
+            globalHighScore = score;
+            $globalHighScore.innerHTML = globalHighScore;
+            db.collection('highscores').doc('global').set({ score: globalHighScore })
+              .then(() => console.log('Global high score updated:', globalHighScore))
+              .catch((error) => console.error('Error updating global high score:', error));
           }
         }
       } else if (game.in_draw()) {
@@ -304,7 +384,7 @@
     function resetGame() {
       game.reset();
       board.start();
-      playerMoveCount = 0; // Reset move count
+      playerMoveCount = 0;
       updateStatus();
       updateMoveHistory();
     }
@@ -332,6 +412,7 @@
       });
     }, 1000);
 
+    updateLevel();
     updateStatus();
     updateMoveHistory();
   </script>
