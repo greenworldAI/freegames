@@ -21,7 +21,7 @@
       width: 400px;
       margin: 0 auto 20px auto;
     }
-    #status {
+    #status, #high-score {
       display: block;
       margin: 10px 0;
       font-weight: bold;
@@ -63,7 +63,6 @@
     button:hover {
       background-color: #0056b3;
     }
-    /* Ensure pieces are visible */
     .piece {
       position: absolute !important;
       width: 100% !important;
@@ -85,6 +84,7 @@
   <h2>Chess on Zentroll Freegames</h2>
   <div id="board"></div>
   <p>Status: <span id="status"></span></p>
+  <p>High Score: <span id="high-score">0</span></p>
   <button onclick="resetGame()">Reset Game</button>
   <div id="move-history">
     <h3>Move History</h3>
@@ -97,9 +97,11 @@
   <script>
     var board = null;
     var game = new Chess();
-    console.log('game methods:', Object.keys(game)); // Debug: Log available methods
+    console.log('game methods:', Object.keys(game));
     var $status = document.getElementById('status');
+    var $highScore = document.getElementById('high-score');
     var $moveList = document.getElementById('move-list');
+    var playerMoveCount = 0; // Track player's (white) moves
 
     var pieceValues = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 200 };
     var pawnSquareTable = [
@@ -136,7 +138,10 @@
       20, 30, 10,  0,  0, 10, 30, 20
     ];
 
-    // Function to parse FEN and build board state
+    // Load high score from localStorage
+    var highScore = localStorage.getItem('chessHighScore') || 0;
+    $highScore.innerHTML = highScore;
+
     function getBoardFromFEN(fen) {
       var board = [];
       var rows = fen.split(' ')[0].split('/');
@@ -163,7 +168,7 @@
     function evaluateBoard() {
       var totalEvaluation = 0;
       var board = getBoardFromFEN(game.fen());
-      console.log('Board state from FEN:', board); // Debug: Log the board state
+      console.log('Board state from FEN:', board);
       for (var i = 0; i < 8; i++) {
         for (var j = 0; j < 8; j++) {
           var piece = board[i][j];
@@ -245,6 +250,7 @@
       });
 
       if (move === null) return 'snapback';
+      playerMoveCount++; // Increment player's move count
       window.setTimeout(makeAIMove, 250);
       updateStatus();
       updateMoveHistory();
@@ -259,6 +265,14 @@
       var moveColor = game.turn() === 'w' ? 'White' : 'Black';
       if (game.in_checkmate()) {
         status = 'Game over, ' + moveColor + ' is in checkmate.';
+        if (moveColor === 'Black') { // Player (White) wins
+          var score = Math.max(0, 1000 - (playerMoveCount * 10)); // Calculate score
+          if (score > highScore) {
+            highScore = score;
+            localStorage.setItem('chessHighScore', highScore);
+            $highScore.innerHTML = highScore;
+          }
+        }
       } else if (game.in_draw()) {
         status = 'Game over, drawn position';
       } else {
@@ -290,6 +304,7 @@
     function resetGame() {
       game.reset();
       board.start();
+      playerMoveCount = 0; // Reset move count
       updateStatus();
       updateMoveHistory();
     }
@@ -299,17 +314,16 @@
       position: 'start',
       pieceTheme: function(piece) {
         var url = 'img/chesspieces/alpha/' + piece + '.png';
-        console.log('Loading piece:', piece, 'from URL:', url); // Debug: Log piece image URLs
+        console.log('Loading piece:', piece, 'from URL:', url);
         return url;
       },
       onDragStart: onDragStart,
       onDrop: onDrop,
       onSnapEnd: onSnapEnd
     };
-    console.log('Chessboard config:', cfg); // Debug: Log the configuration
+    console.log('Chessboard config:', cfg);
     board = Chessboard('board', cfg);
 
-    // Debug: Check piece elements after board initialization
     setTimeout(function() {
       var pieceElements = document.querySelectorAll('.piece');
       console.log('Piece elements found:', pieceElements.length);
