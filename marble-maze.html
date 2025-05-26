@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>3D Marble Maze</title>
   <style>
     body,html { margin:0; padding:0; overflow:hidden; background:#000; }
@@ -22,7 +22,11 @@
       opacity:0; pointer-events:none; transition:opacity .3s;
     }
     #overlay.visible { opacity:1; pointer-events:auto; }
-    #overlay button { margin-top:1em; padding:8px 16px; background:#444; border:none; color:#fff; border-radius:4px; cursor:pointer; }
+    #overlay button {
+      margin-top:1em; padding:8px 16px;
+      background:#444; border:none; color:#fff; border-radius:4px;
+      cursor:pointer;
+    }
     #overlay button:hover { background:#555; }
   </style>
 </head>
@@ -34,29 +38,20 @@
     <div id="overlay"><div id="msg"></div><button id="btn">Restart</button></div>
   </div>
 
-  <!-- Three.js -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
   <script>
   (function(){
-    // DOM
-    const container = document.getElementById('game-container');
-    const timerEl   = document.getElementById('timer');
-    const bestEl    = document.getElementById('best');
-    const overlay   = document.getElementById('overlay');
-    const msgEl     = document.getElementById('msg');
-    const btn       = document.getElementById('btn');
+    const container = document.getElementById('game-container'),
+          timerEl   = document.getElementById('timer'),
+          bestEl    = document.getElementById('best'),
+          overlay   = document.getElementById('overlay'),
+          msgEl     = document.getElementById('msg'),
+          btn       = document.getElementById('btn');
 
-    // scene, camera, renderer
     let scene, camera, renderer;
-    // objects
-    let walls = [], wallBoxes = [];
-    let exitBox;
-    let marble;
-    // physics
+    let walls = [], wallBoxes = [], exitBox, marble;
     let vel = new THREE.Vector3();
-    const RADIUS = 0.4;
-    const FRICTION = 0.98;
-    // maze layout (#=wall .=floor E=exit)
+    const RADIUS = 0.4, FRICTION = 0.98;
     const layout = [
       '##########',
       '#........#',
@@ -67,72 +62,69 @@
       '#........#',
       '##########'
     ];
-    const ROWS = layout.length, COLS = layout[0].length;
-    const CELL = 2;
-    // timer
+    const ROWS = layout.length, COLS = layout[0].length, CELL = 2;
     let startTime, bestTime = parseFloat(localStorage.getItem('mazeBest'));
     if(isNaN(bestTime)) bestTime = null;
-    function updateBestDisplay() { bestEl.textContent = 'Best: ' + (bestTime? bestTime.toFixed(1)+'s':'--'); }
+    function updateBestDisplay(){
+      bestEl.textContent = 'Best: ' + (bestTime ? bestTime.toFixed(1)+'s' : '--');
+    }
     updateBestDisplay();
 
-    // init
     function init(){
       overlay.classList.remove('visible');
       scene = new THREE.Scene();
       camera = new THREE.PerspectiveCamera(60,1,0.1,1000);
       camera.position.set(0,10,10);
       camera.lookAt(0,0,0);
-      // renderer
+
       if(renderer) renderer.dispose();
       renderer = new THREE.WebGLRenderer({antialias:true});
       renderer.setSize(container.clientWidth, container.clientHeight);
-      container.innerHTML=''; container.appendChild(renderer.domElement);
+      container.innerHTML='';
+      container.appendChild(renderer.domElement);
       window.addEventListener('resize', onResize);
       onResize();
 
       // lights
-      const amb = new THREE.AmbientLight(0x888888); scene.add(amb);
-      const dir = new THREE.DirectionalLight(0xffffff,0.6); dir.position.set(5,10,5); scene.add(dir);
+      scene.add(new THREE.AmbientLight(0x888888));
+      const dir = new THREE.DirectionalLight(0xffffff,0.6);
+      dir.position.set(5,10,5);
+      scene.add(dir);
 
-      // build maze
-      walls=[]; wallBoxes=[];
-      layout.forEach((row,r)=>{ for(let c=0;c<COLS;c++){
-        const ch = row[c];
-        if(ch === '#'){
-          const geo = new THREE.BoxGeometry(CELL,1,CELL);
-          const mat = new THREE.MeshLambertMaterial({color:0x4444ff});
-          const box = new THREE.Mesh(geo,mat);
-          box.position.set(
-            (c-COLS/2+0.5)*CELL,
-            0.5,
-            (r-ROWS/2+0.5)*CELL
-          );
-          scene.add(box); walls.push(box);
-          const bb = new THREE.Box3().setFromObject(box);
-          wallBoxes.push(bb);
-        } else if(ch === 'E'){
-          const ex = (c-COLS/2+0.5)*CELL;
-          const ez = (r-ROWS/2+0.5)*CELL;
-          exitBox = new THREE.Box3(
-            new THREE.Vector3(ex-0.5,0,ez-0.5),
-            new THREE.Vector3(ex+0.5,1,ez+0.5)
-          );
-          const geo = new THREE.BoxGeometry(CELL,0.2,CELL);
-          const mat = new THREE.MeshLambertMaterial({color:0x00ff00});
-          const p = new THREE.Mesh(geo,mat);
-          p.position.set(ex,0.1,ez);
-          scene.add(p);
+      // maze walls & exit
+      walls = []; wallBoxes = [];
+      layout.forEach((row,r)=>{
+        for(let c=0;c<COLS;c++){
+          const ch = row[c];
+          const x = (c - COLS/2 + .5)*CELL;
+          const z = (r - ROWS/2 + .5)*CELL;
+          if(ch === '#'){
+            const geo = new THREE.BoxGeometry(CELL,1,CELL);
+            const mat = new THREE.MeshLambertMaterial({color:0x4444ff});
+            const box = new THREE.Mesh(geo,mat);
+            box.position.set(x,0.5,z);
+            scene.add(box);
+            walls.push(box);
+            wallBoxes.push(new THREE.Box3().setFromObject(box));
+          } else if(ch === 'E'){
+            exitBox = new THREE.Box3(
+              new THREE.Vector3(x-.5,0,z-.5),
+              new THREE.Vector3(x+.5,1,z+.5)
+            );
+            const geo = new THREE.BoxGeometry(CELL,0.2,CELL);
+            const mat = new THREE.MeshLambertMaterial({color:0x00ff00});
+            const p = new THREE.Mesh(geo,mat);
+            p.position.set(x,0.1,z);
+            scene.add(p);
+          }
         }
-      }});
+      });
 
       // marble
-      const geo = new THREE.SphereGeometry(RADIUS,16,16);
-      const mat = new THREE.MeshLambertMaterial({color:0xff0000});
-      marble = new THREE.Mesh(geo,mat);
-      // start pos
-      marble.position.set(
-        (-COLS/2+1.5)*CELL, RADIUS, (-ROWS/2+1.5)*CELL
-      );
+      const mgeo = new THREE.SphereGeometry(RADIUS,16,16);
+      const mmat = new THREE.MeshLambertMaterial({color:0xff0000});
+      marble = new THREE.Mesh(mgeo,mmat);
+      marble.position.set((-COLS/2+1.5)*CELL, RADIUS, (-ROWS/2+1.5)*CELL);
       scene.add(marble);
       vel.set(0,0,0);
       startTime = performance.now();
@@ -140,53 +132,57 @@
     }
 
     function onResize(){
-      const w=container.clientWidth, h=container.clientHeight;
+      const w = container.clientWidth, h = container.clientHeight;
       camera.aspect = w/h; camera.updateProjectionMatrix();
       renderer.setSize(w,h);
     }
-    // controls
-    let tiltX=0, tiltY=0;
-    window.addEventListener('deviceorientation',e=>{
-      tiltY = THREE.Math.degToRad((e.beta||0)-45);
-      tiltX = THREE.Math.degToRad((e.gamma||0));
+
+    let tiltX = 0, tiltY = 0;
+    window.addEventListener('deviceorientation', e => {
+      tiltY = THREE.Math.degToRad((e.beta||0) - 45);
+      tiltX = THREE.Math.degToRad(e.gamma||0);
     });
-    window.addEventListener('keydown',e=>{
-      const small=0.3;
-      if(e.key==='ArrowUp') tiltY=-small;
-      if(e.key==='ArrowDown') tiltY=small;
-      if(e.key==='ArrowLeft') tiltX=-small;
-      if(e.key==='ArrowRight') tiltX=small;
+    window.addEventListener('keydown', e => {
+      const small = .3;
+      if(e.key==='ArrowUp')    tiltY = -small;
+      if(e.key==='ArrowDown')  tiltY = small;
+      if(e.key==='ArrowLeft')  tiltX = -small;
+      if(e.key==='ArrowRight') tiltX = small;
     });
 
     function animate(){
       requestAnimationFrame(animate);
-      // physics
       const acc = new THREE.Vector3(Math.sin(tiltX)*5,0,Math.sin(tiltY)*5);
       vel.addScaledVector(acc,0.016);
       vel.multiplyScalar(FRICTION);
       marble.position.addScaledVector(vel,0.016);
-      // collision with walls
-      const p=marble.position;
-      wallBoxes.forEach(bb=>{
-        if(bb.containsPoint(p)){
-          // simple: push back
-          p.sub(vel);
+
+      // wall collision
+      wallBoxes.forEach(bb => {
+        if(bb.containsPoint(marble.position)){
+          marble.position.sub(vel);
           vel.set(0,0,0);
         }
       });
-      // check exit
-      if(exitBox.containsPoint(p)){
-        const t=(performance.now()-startTime)/1000;
-        if(bestTime===null||t<bestTime){ bestTime=t; localStorage.setItem('mazeBest',bestTime); updateBestDisplay(); }
-        msgEl.innerHTML=`🎉 You Escaped in ${t.toFixed(1)}s`;
+
+      // exit check
+      if(exitBox.containsPoint(marble.position)){
+        const t = (performance.now() - startTime)/1000;
+        if(bestTime===null || t<bestTime){
+          bestTime = t;
+          localStorage.setItem('mazeBest', bestTime);
+          updateBestDisplay();
+        }
+        msgEl.innerHTML = `🎉 You Escaped in ${t.toFixed(1)}s`;
         overlay.classList.add('visible');
         return;
       }
+
       renderer.render(scene,camera);
       timerEl.textContent = 'Time: '+((performance.now()-startTime)/1000).toFixed(1)+'s';
     }
 
-    btn.addEventListener('click',init);
+    btn.addEventListener('click', init);
     init();
   })();
   </script>
