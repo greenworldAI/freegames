@@ -63,6 +63,16 @@
     button:hover {
       background-color: #0056b3;
     }
+    /* Ensure pieces are visible */
+    .piece {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background-size: contain !important;
+      background-repeat: no-repeat !important;
+      background-position: center !important;
+      z-index: 1;
+    }
   </style>
 </head>
 <body>
@@ -147,6 +157,7 @@
     function evaluateBoard() {
       var totalEvaluation = 0;
       var board = getBoardFromFEN(game.fen());
+      console.log('Board state from FEN:', board); // Debug: Log the board state
       for (var i = 0; i < 8; i++) {
         for (var j = 0; j < 8; j++) {
           var piece = board[i][j];
@@ -280,7 +291,11 @@
     var cfg = {
       draggable: true,
       position: 'start',
-      pieceTheme: 'https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/alpha/{piece}.png',
+      pieceTheme: function(piece) {
+        var url = 'https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/alpha/' + piece + '.png';
+        console.log('Loading piece:', piece, 'from URL:', url); // Debug: Log piece image URLs
+        return url;
+      },
       onDragStart: onDragStart,
       onDrop: onDrop,
       onSnapEnd: onSnapEnd
