@@ -1,264 +1,142 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Endless Tunnel Runner</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Endless Runner</title>
   <style>
-    body { margin:0; overflow:hidden; background:#000 }
-    #game-wrapper {
-      position:relative;
-      width:100%; max-width:600px;
-      margin:1em auto;
+    body,html {margin:0;padding:0;overflow:hidden;background:#111;}
+    #game {display:block;width:100%;height:400px;background:#222;}
+    #scoreboard {
+      position:absolute; top:8px; left:8px;
+      color:#fff; font:20px sans-serif;
     }
-    .panel {
-      background:#0f1e33; color:#fff;
-      font-family:sans-serif; font-size:1.1em;
-      padding:8px; border-radius:8px;
-      display:flex; justify-content:space-between;
-      align-items:center; box-sizing:border-box;
-    }
-    #game-container {
-      width:100%; height:500px;
-    }
-    #message-overlay {
-      position:absolute; top:0; left:0;
-      width:100%; height:100%;
-      background:rgba(0,0,0,0.7); color:#fff;
-      font-family:sans-serif; font-size:1.4em;
-      display:flex; align-items:center; justify-content:center;
-      flex-direction:column; border-radius:8px;
-      opacity:0; pointer-events:none;
-      transition:opacity .3s;
-    }
-    #message-overlay.visible {
-      opacity:1; pointer-events:all;
-    }
-    #message-overlay button {
-      margin-top:1em; padding:8px 16px;
-      background:#444; border:none; color:#fff;
-      border-radius:4px; cursor:pointer;
-    }
-    #message-overlay button:hover { background:#555 }
-    /* fallback text if no WebGL */
-    #game-container .fallback {
-      color:#fff; text-align:center; padding-top:200px;
-      font-family:sans-serif;
+    #highscore {
+      position:absolute; top:8px; right:8px;
+      color:#fff; font:20px sans-serif;
     }
   </style>
 </head>
 <body>
+  <canvas id="game"></canvas>
+  <div id="scoreboard">Distance: <span id="score">0</span></div>
+  <div id="highscore">High Score: <span id="hs">0</span></div>
 
-  <div id="game-wrapper">
-    <div class="panel">
-      <div>Distance: <span id="distance">0</span></div>
-      <div>High Score: <span id="highscore">0</span></div>
-    </div>
-
-    <div id="game-container"></div>
-
-    <div id="message-overlay">
-      <div id="message-text"></div>
-      <button id="play-again">Play Again</button>
-    </div>
-  </div>
-
-  <!-- load the global THREE build -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
   <script>
   (function(){
-    const container = document.getElementById('game-container');
-    const overlay   = document.getElementById('message-overlay');
-    const msgText   = document.getElementById('message-text');
-    const playBtn   = document.getElementById('play-again');
-    const distEl    = document.getElementById('distance');
-    const highEl    = document.getElementById('highscore');
+    const canvas = document.getElementById("game"),
+          ctx    = canvas.getContext("2d"),
+          scoreEl= document.getElementById("score"),
+          highEl = document.getElementById("hs");
 
-    // WebGL check (global build provides WEBGL helper)
-    if (!THREE.WEBGL.isWebGLAvailable()) {
-      container.innerHTML = '<div class="fallback">⚠️ WebGL not supported</div>';
-      return;
+    let W,H,scale=2;
+    function resize(){
+      W = canvas.clientWidth;
+      H = canvas.clientHeight;
+      canvas.width  = W*scale;
+      canvas.height = H*scale;
+      ctx.scale(scale,scale);
     }
+    window.addEventListener("resize",resize);
+    resize();
 
-    let scene, camera, renderer;
-    let tunnel = [], obstacles = [];
-    const SEG_COUNT   = 50,
-          SEG_SPACING = 2,
-          TUNNEL_RAD  = 10,
-          OBST_COUNT  = 30,
-          SPEED       = 0.15;
-    let distance  = 0,
-        highscore = 0;
-    let cameraBox;
+    // Player
+    const player = { x:50, y:0, w:30, h:50, vy:0, onGround:false };
+    const gravity = 0.8, jumpVel = -15;
 
-    function loadHigh(){
-      highscore = parseFloat(localStorage.getItem('tunnelHigh')) || 0;
-      highEl.textContent = Math.floor(highscore);
-    }
-    function saveHigh(){
-      if(distance > highscore){
-        highscore = distance;
-        localStorage.setItem('tunnelHigh', highscore);
-        highEl.textContent = Math.floor(highscore);
-      }
-    }
+    // Obstacles
+    let obstacles = [], spawnTimer = 0;
 
-    function init(){
-      distance = 0;
-      distEl.textContent = '0';
-      overlay.classList.remove('visible');
+    let score = 0,
+        highScore = parseInt(localStorage.getItem("runHS")) || 0;
+    highEl.textContent = highScore;
 
-      // scene & camera
-      scene = new THREE.Scene();
-      camera = new THREE.PerspectiveCamera(
-        75,
-        container.clientWidth/container.clientHeight,
-        0.1, 1000
-      );
-      camera.position.set(0,0,0);
-
-      // renderer
-      if(renderer) renderer.dispose();
-      renderer = new THREE.WebGLRenderer({antialias:true});
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
-      renderer.setSize(container.clientWidth,container.clientHeight);
-      container.innerHTML = '';
-      container.appendChild(renderer.domElement);
-
-      // tunnel: back‐side cylinders
-      tunnel = [];
-      const geo = new THREE.CylinderGeometry(
-        TUNNEL_RAD, TUNNEL_RAD, SEG_SPACING, 32, 1, true
-      );
-      geo.rotateX(Math.PI/2);
-      const mat = new THREE.MeshBasicMaterial({
-        color:0x4444ff, side: THREE.BackSide
-      });
-      for(let i=0; i<SEG_COUNT; i++){
-        const seg = new THREE.Mesh(geo, mat);
-        seg.position.z = -(i+1)*SEG_SPACING;
-        scene.add(seg);
-        tunnel.push(seg);
-      }
-
-      // obstacles
+    function reset(){
       obstacles = [];
-      const boxGeo = new THREE.BoxGeometry(1,1,1);
-      const boxMat = new THREE.MeshBasicMaterial({color:0xff4444});
-      for(let i=0; i<OBST_COUNT; i++){
-        const b = new THREE.Mesh(boxGeo, boxMat);
-        b.userData.box = new THREE.Box3();
-        resetObstacle(b);
-        scene.add(b);
-        obstacles.push(b);
+      spawnTimer = 0;
+      score = 0;
+      scoreEl.textContent = score;
+      player.y = 0; player.vy = 0; player.onGround = false;
+    }
+
+    function spawn(){
+      const size = 20 + Math.random()*30;
+      obstacles.push({ x:W, y:H-50-size, size });
+      spawnTimer = 60 + Math.random()*60;
+    }
+
+    function update(){
+      // Player physics
+      player.vy += gravity;
+      player.y += player.vy;
+      if(player.y + player.h > H){
+        player.y = H - player.h;
+        player.vy = 0;
+        player.onGround = true;
       }
 
-      cameraBox = new THREE.Box3();
-
-      window.addEventListener('resize', onResize);
-      setupControls();
-      animate();
-    }
-
-    function resetObstacle(b){
-      b.position.z = -Math.random()*SEG_COUNT*SEG_SPACING;
-      b.position.x = (Math.random()*2-1)*(TUNNEL_RAD-1);
-      b.position.y = (Math.random()*2-1)*(TUNNEL_RAD-1);
-    }
-
-    function onResize(){
-      camera.aspect = container.clientWidth/container.clientHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(container.clientWidth,container.clientHeight);
-    }
-
-    const keys = {};
-    let tsx=0, tsy=0;
-    function setupControls(){
-      // keyboard
-      window.addEventListener('keydown', e=>{
-        if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key)){
-          e.preventDefault();
-          keys[e.key] = true;
-        }
-      });
-      window.addEventListener('keyup', e=>{ keys[e.key] = false; });
-
-      // mobile swipe
-      container.addEventListener('touchstart', e=>{
-        tsx = e.touches[0].clientX;
-        tsy = e.touches[0].clientY;
-      }, {passive:true});
-      container.addEventListener('touchend', e=>{
-        const dx = e.changedTouches[0].clientX - tsx;
-        const dy = e.changedTouches[0].clientY - tsy;
-        if(Math.abs(dx)>Math.abs(dy) && Math.abs(dx)>30){
-          keys[ dx>0 ? 'ArrowRight' : 'ArrowLeft' ] = true;
-          setTimeout(()=>{ keys['ArrowRight']=keys['ArrowLeft']=false; },100);
-        } else if(Math.abs(dy)>30){
-          keys[ dy>0 ? 'ArrowDown' : 'ArrowUp' ] = true;
-          setTimeout(()=>{ keys['ArrowDown']=keys['ArrowUp']=false; },100);
-        }
-      }, {passive:true});
-
-      playBtn.addEventListener('click', init);
-    }
-
-    function animate(){
-      requestAnimationFrame(animate);
-
-      // scroll tunnel
-      tunnel.forEach(seg=>{
-        seg.position.z += SPEED;
-        if(seg.position.z > 1) seg.position.z -= SEG_COUNT*SEG_SPACING;
-      });
-
-      // camera collider
-      cameraBox.setFromCenterAndSize(
-        camera.position,
-        new THREE.Vector3(1,1,1)
-      );
-
-      // move & collide obstacles
-      for(const o of obstacles){
-        o.position.z += SPEED;
-        if(o.position.z > 1) resetObstacle(o);
-        o.userData.box.setFromObject(o);
-        if(cameraBox.intersectsBox(o.userData.box)){
-          saveHigh();
-          showMessage(`💥 Game Over!<br>Distance: ${Math.floor(distance)}`);
+      // Obstacles
+      spawnTimer--;
+      if(spawnTimer <= 0) spawn();
+      for(let i=0;i<obstacles.length;i++){
+        const o = obstacles[i];
+        o.x -= 6;
+        // Collision?
+        if(player.x < o.x + o.size &&
+           player.x + player.w > o.x &&
+           player.y < o.y + o.size &&
+           player.y + player.h > o.y){
+          // Game Over
+          if(score > highScore){
+            highScore = score;
+            localStorage.setItem("runHS", highScore);
+            highEl.textContent = highScore;
+          }
+          reset();
           return;
         }
       }
+      // Remove off-screen
+      obstacles = obstacles.filter(o => o.x + o.size > 0);
 
-      // steering & clamp
-      const step = 0.1;
-      if(keys['ArrowLeft'])  camera.position.x -= step;
-      if(keys['ArrowRight']) camera.position.x += step;
-      if(keys['ArrowUp'])    camera.position.y += step;
-      if(keys['ArrowDown'])  camera.position.y -= step;
-      const maxOff = TUNNEL_RAD-1;
-      const dx = camera.position.x, dy = camera.position.y;
-      if(dx*dx + dy*dy > maxOff*maxOff){
-        const a = Math.atan2(dy,dx);
-        camera.position.x = Math.cos(a)*maxOff;
-        camera.position.y = Math.sin(a)*maxOff;
+      // Score
+      score++;
+      scoreEl.textContent = score;
+    }
+
+    function draw(){
+      ctx.clearRect(0,0,W,H);
+      // Player
+      ctx.fillStyle = "#09f";
+      ctx.fillRect(player.x, player.y, player.w, player.h);
+      // Obstacles
+      ctx.fillStyle = "#f33";
+      obstacles.forEach(o => ctx.fillRect(o.x, o.y, o.size, o.size));
+    }
+
+    function loop(){
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    // Input
+    window.addEventListener("keydown", e=>{
+      if((e.code==="Space"||e.code==="ArrowUp") && player.onGround){
+        player.vy = jumpVel;
+        player.onGround = false;
       }
+    });
+    canvas.addEventListener("touchstart", ()=>{
+      if(player.onGround){
+        player.vy = jumpVel;
+        player.onGround = false;
+      }
+    }, {passive:true});
 
-      // distance
-      distance += SPEED;
-      distEl.textContent = Math.floor(distance);
-
-      renderer.render(scene, camera);
-    }
-
-    function showMessage(html){
-      msgText.innerHTML = html;
-      overlay.classList.add('visible');
-    }
-
-    loadHigh();
-    init();
+    // Start
+    reset();
+    loop();
   })();
   </script>
 </body>
