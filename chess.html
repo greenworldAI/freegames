@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Chess - Zentroll Freegames</title>
-  <link rel="stylesheet" href="assets/chessboard-1.0.0.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -75,10 +75,9 @@
     <ul id="move-list"></ul>
   </div>
 
-  <!-- Include jQuery before chessboard.js -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <script src="assets/chess.min.js"></script>
-  <script src="assets/chessboard-1.0.0.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.2/chess.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
   <script>
     var board = null;
     var game = new Chess();
@@ -122,6 +121,10 @@
 
     function evaluateBoard() {
       var totalEvaluation = 0;
+      if (typeof game.board !== 'function') {
+        console.error('game.board is not a function. Available methods:', Object.keys(game));
+        return 0; // Fallback to avoid breaking the AI
+      }
       var board = game.board();
       for (var i = 0; i < 8; i++) {
         for (var j = 0; j < 8; j++) {
@@ -256,6 +259,7 @@
     var cfg = {
       draggable: true,
       position: 'start',
+      pieceTheme: 'https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/img/chesspieces/alpha/{piece}.png',
       onDragStart: onDragStart,
       onDrop: onDrop,
       onSnapEnd: onSnapEnd
