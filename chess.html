@@ -81,6 +81,7 @@
   <script>
     var board = null;
     var game = new Chess();
+    console.log('game methods:', Object.keys(game)); // Debug: Log available methods
     var $status = document.getElementById('status');
     var $moveList = document.getElementById('move-list');
 
@@ -119,13 +120,34 @@
       20, 30, 10,  0,  0, 10, 30, 20
     ];
 
+    // Function to parse FEN and build board state
+    function getBoardFromFEN(fen) {
+      var board = [];
+      var rows = fen.split(' ')[0].split('/');
+      for (var i = 0; i < 8; i++) {
+        var row = [];
+        var cols = rows[i].split('');
+        var colIndex = 0;
+        for (var j = 0; j < cols.length; j++) {
+          if (isNaN(cols[j])) {
+            row[colIndex] = { type: cols[j].toLowerCase(), color: cols[j] === cols[j].toUpperCase() ? 'w' : 'b' };
+            colIndex++;
+          } else {
+            for (var k = 0; k < parseInt(cols[j]); k++) {
+              row[colIndex] = null;
+              colIndex++;
+            }
+          }
+        }
+        board[i] = row;
+      }
+      return board;
+    }
+
     function evaluateBoard() {
       var totalEvaluation = 0;
-      if (typeof game.board !== 'function') {
-        console.error('game.board is not a function. Available methods:', Object.keys(game));
-        return 0; // Fallback to avoid breaking the AI
-      }
-      var board = game.board();
+      // Use FEN parsing instead of game.board()
+      var board = getBoardFromFEN(game.fen());
       for (var i = 0; i < 8; i++) {
         for (var j = 0; j < 8; j++) {
           var piece = board[i][j];
