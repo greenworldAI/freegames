@@ -97,14 +97,14 @@
 
   <script>
     (function() {
-      const canvas = document.getElementById('gameCanvas');
-      const ctx = canvas.getContext('2d');
-      const scoreBoard = document.getElementById('scoreBoard');
+      const canvas         = document.getElementById('gameCanvas');
+      const ctx            = canvas.getContext('2d');
+      const scoreBoard     = document.getElementById('scoreBoard');
       const gameOverScreen = document.getElementById('gameOverScreen');
-      const gameOverText = document.getElementById('gameOverText');
-      const restartBtn = document.getElementById('restartBtn');
+      const gameOverText   = document.getElementById('gameOverText');
+      const restartBtn     = document.getElementById('restartBtn');
 
-      // -- Game state variables --
+      // -- Game state variables (declared up front) --
       let ball, bin, groundY;
       let isDragging = false;
       let dragCurrentX = 0, dragCurrentY = 0;
@@ -113,28 +113,32 @@
       let wind = 0;
       let animationId = null;
 
-      const gravity = 0.5;
+      const gravity     = 0.5;
       const powerFactor = 0.15;
 
-      /** 
+      /**
        * Resize the canvas to fill its CSS dimensions 
-       * (width:100%, height:calc(100vh-50px)) 
+       * (width:100%, height:calc(100vh - 50px)) 
        * and then re-initialize everything.
        */
       function resizeCanvas() {
-        // Set the internal drawing buffer to match the CSS size
-        canvas.width = canvas.offsetWidth;
+        // 1. Make the internal drawing buffer match the CSS pixels
+        canvas.width  = canvas.offsetWidth;
         canvas.height = canvas.offsetHeight;
 
-        // Re-initialize the ball/bin positions based on new size
+        // 2. Initialize ball/bin now that we know the new canvas size
         initGameObjects();
+
+        // 3. Reset scoreboard text
         updateScoreboard();
+
+        // 4. Draw once, now that groundY is set
         drawScene();
       }
 
       // -- Initialize positions/sizes of ball and bin --
       function initGameObjects() {
-        // Define ground line at 90% of canvas height
+        // Place the “ground” line at 90% down the canvas
         groundY = canvas.height * 0.9;
 
         // Ball starts near left, just above the ground
@@ -149,28 +153,33 @@
           inMotion: false
         };
 
-        // Bin is on the right side: 10% of canvas width, 20% of canvas height
-        const binWidth = canvas.width * 0.1;
+        // Bin (a small box) sits on the right side, 10% width × 20% height
+        const binWidth  = canvas.width * 0.1;
         const binHeight = canvas.height * 0.2;
         bin = {
-          x: canvas.width * 0.8,
-          y: groundY - binHeight,
-          width: binWidth,
+          x:     canvas.width * 0.8,
+          y:     groundY - binHeight,
+          width:  binWidth,
           height: binHeight,
           wallThickness: 8
         };
       }
 
-      // -- Draw ground, bin, ball, and any aim-line if dragging --
+      // -- Draw the ground, the bin, the paper ball, and the aim‐line (if dragging) --
       function drawScene() {
-        // Clear entire canvas
+        // If groundY is not set yet (i.e. still undefined), bail out early:
+        if (typeof groundY === 'undefined') {
+          return;
+        }
+
+        // 1. Clear the entire canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Draw ground rectangle
+        // 2. Draw ground rectangle
         ctx.fillStyle = '#8d6e63'; // brown ground
         ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
 
-        // Draw bin (a left wall, right wall, and bottom):
+        // 3. Draw bin (left wall, right wall, and bottom)
         ctx.fillStyle = '#546e7a'; // dark gray/blue
         // Left wall
         ctx.fillRect(bin.x, bin.y, bin.wallThickness, bin.height);
@@ -179,7 +188,7 @@
         // Bottom
         ctx.fillRect(bin.x, bin.y + bin.height - bin.wallThickness, bin.width, bin.wallThickness);
 
-        // Draw paper ball (circle)
+        // 4. Draw paper ball (white circle with gray outline)
         ctx.beginPath();
         ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
         ctx.fillStyle = '#ffffff';
@@ -189,32 +198,32 @@
         ctx.stroke();
         ctx.closePath();
 
-        // If the user is currently dragging, draw an aim-line
+        // 5. If the user is dragging, draw an aim‐line from the ball to the current pointer
         if (isDragging) {
           ctx.beginPath();
           ctx.moveTo(ball.x, ball.y);
           ctx.lineTo(dragCurrentX, dragCurrentY);
-          ctx.strokeStyle = 'rgba(255, 87, 34, 0.8)';
+          ctx.strokeStyle = 'rgba(255, 87, 34, 0.8)'; // semi‐opaque orange
           ctx.lineWidth = 3;
           ctx.stroke();
           ctx.closePath();
         }
       }
 
-      // -- Main physics loop (called via requestAnimationFrame) --
+      // -- Main physics loop (called by requestAnimationFrame) --
       function update() {
         if (!ball.inMotion) {
           drawScene();
           return;
         }
 
-        // Apply gravity and a tiny bit of wind
+        // Apply gravity and a little wind to the ball’s velocity
         ball.vy += gravity;
         ball.vx += wind;
-        ball.x += ball.vx;
-        ball.y += ball.vy;
+        ball.x  += ball.vx;
+        ball.y  += ball.vy;
 
-        // Check ground collision
+        // If the ball touches the ground line, stop it and check if it landed in the bin
         if (ball.y + ball.r >= groundY) {
           ball.y = groundY - ball.r;
           ball.inMotion = false;
@@ -222,7 +231,7 @@
           return;
         }
 
-        // If the ball goes off left/top/right edges, treat it as “missed”
+        // If the ball flies off the left/top/right edges, treat it as a miss
         if (
           ball.x + ball.r < 0 ||
           ball.y + ball.r < 0 ||
@@ -237,12 +246,12 @@
         animationId = requestAnimationFrame(update);
       }
 
-      // -- After the ball stops, check if it landed in the bin opening --
+      // -- After the ball stops, see if it fell inside the bin opening --
       function checkLanding() {
-        const ballBottom = ball.y + ball.r;
+        const ballBottom  = ball.y + ball.r;
         const ballCenterX = ball.x;
 
-        // Landed exactly on ground and X is within bin opening?
+        // Landed on ground AND X is within bin opening?
         if (
           ballBottom >= groundY - 1 &&
           ballCenterX >= bin.x + bin.wallThickness &&
@@ -252,22 +261,23 @@
         }
 
         updateScoreboard();
+
         if (shotsLeft > 0) {
-          // Reset for next shot after a short pause
+          // Prepare next shot after a short pause
           setTimeout(resetBall, 700);
         } else {
-          // No shots left → show Game Over
+          // No shots left → show Game Over screen
           setTimeout(showGameOver, 700);
         }
         drawScene();
       }
 
-      // -- Update the “Shots Left” and “Score” text at top --
+      // -- Update the “Shots Left” and “Score” text at the top --
       function updateScoreboard() {
         scoreBoard.textContent = `Shots Left: ${shotsLeft}  |  Score: ${score}`;
       }
 
-      // -- Put the ball back at its starting spot, reset velocities/wind --
+      // -- Put the ball back to its starting spot, reset velocities and wind --
       function resetBall() {
         ball.x = canvas.width * 0.1;
         ball.y = groundY - ball.r - 5;
@@ -278,25 +288,25 @@
         drawScene();
       }
 
-      // -- Display the Game Over overlay and final score --
+      // -- Display the Game Over overlay with the final score --
       function showGameOver() {
         gameOverText.innerHTML = `Game Over<br/>Score: ${score} / 5`;
         gameOverScreen.style.visibility = 'visible';
       }
 
-      // -- Reset entire game state (5 shots, score = 0) --
+      // -- Reset the entire game state (5 shots again, score back to 0) --
       function restartGame() {
         shotsLeft = 5;
-        score = 0;
+        score     = 0;
         updateScoreboard();
         gameOverScreen.style.visibility = 'hidden';
         initGameObjects();
         drawScene();
       }
 
-      // -- Handle pointer/mouse/touch events to “drag & flick” the ball -- 
+      // -- Handle pointer/mouse/touch events so that the user can "drag & flick" the ball --
       function onPointerDown(e) {
-        // Don’t let default scrolling on touch devices interfere
+        // Prevent default scrolling on touch
         e.preventDefault();
         const rect = canvas.getBoundingClientRect();
         const clientX = (e.clientX !== undefined ? e.clientX : e.touches[0].clientX);
@@ -305,7 +315,7 @@
         const py = clientY - rect.top;
         const distance = Math.hypot(px - ball.x, py - ball.y);
 
-        // Only start drag if user tapped inside the ball, ball is not already moving, and shots remain
+        // Only begin drag if user tapped inside the ball, ball isn't moving, and shots remain
         if (distance <= ball.r && !ball.inMotion && shotsLeft > 0) {
           isDragging = true;
         }
@@ -328,7 +338,7 @@
         dragCurrentX = clientX - rect.left;
         dragCurrentY = clientY - rect.top;
 
-        // Compute velocity vector: from ball.x/ball.y toward dragCurrentX/dragCurrentY
+        // Compute velocity vector from ball.x/ball.y → dragCurrentX/dragCurrentY
         const dx = dragCurrentX - ball.x;
         const dy = dragCurrentY - ball.y;
         ball.vx = dx * powerFactor;
@@ -336,13 +346,13 @@
         ball.inMotion = true;
         shotsLeft--;
 
-        // Give a tiny random wind push each shot
+        // Give a tiny random wind push on each shot
         wind = (Math.random() * 0.2 - 0.1);
         updateScoreboard();
         animationId = requestAnimationFrame(update);
       }
 
-      // -- Attach event listeners for mouse+touch --
+      // -- Attach event listeners for mouse + touch --
       canvas.addEventListener('mousedown', onPointerDown);
       canvas.addEventListener('touchstart', onPointerDown, { passive: false });
       canvas.addEventListener('mousemove', onPointerMove);
@@ -352,7 +362,7 @@
 
       restartBtn.addEventListener('click', restartGame);
 
-      // -- When window loads or resizes, re-size the canvas and redraw everything --
+      // -- When the window finishes loading (and any time it’s resized), re-size and redraw --
       window.addEventListener('load', resizeCanvas);
       window.addEventListener('resize', resizeCanvas);
     })();
