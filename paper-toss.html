@@ -44,7 +44,7 @@
     /* The canvas takes up the entire remaining viewport below the scoreboard */
     #gameCanvas {
       position: absolute;
-      top: 0;              /* alignment start */
+      top: 0;
       left: 0;
       width: 100%;
       height: calc(100vh - 50px); /* leave ~50px for the scoreboard */
@@ -217,13 +217,66 @@
           return;
         }
 
-        // Apply gravity and a little wind to the ball’s velocity
+        // 1. Apply gravity & wind
         ball.vy += gravity;
         ball.vx += wind;
         ball.x  += ball.vx;
         ball.y  += ball.vy;
 
-        // If the ball touches the ground line, stop it and check if it landed in the bin
+        // ──────────
+        // 2.5) BIN COLLISION DETECTION
+        // ──────────
+        // A) COLLIDE WITH LEFT WALL
+        if (
+          // Is the ball’s left edge inside the left wall region?
+          ball.x - ball.r < (bin.x + bin.wallThickness) &&
+          ball.x - ball.r > bin.x &&
+          // Is the ball vertically within the bin’s height?
+          (ball.y + ball.r > bin.y && ball.y - ball.r < bin.y + bin.height)
+        ) {
+          // Push the ball right of the wall, and reverse vx (dampen)
+          ball.x = bin.x + bin.wallThickness + ball.r;
+          ball.vx *= -0.3;
+        }
+
+        // B) COLLIDE WITH RIGHT WALL
+        if (
+          // Is the ball’s right edge inside the right wall region?
+          ball.x + ball.r > (bin.x + bin.width - bin.wallThickness) &&
+          ball.x + ball.r < (bin.x + bin.width) &&
+          // Is the ball vertically within the bin’s height?
+          (ball.y + ball.r > bin.y && ball.y - ball.r < bin.y + bin.height)
+        ) {
+          // Push the ball left of the wall, and reverse vx (dampen)
+          ball.x = bin.x + bin.width - bin.wallThickness - ball.r;
+          ball.vx *= -0.3;
+        }
+
+        // C) LAND ON THE BIN FLOOR (only if between the two walls)
+        if (
+          // Is the ball’s bottom edge below or touching the bin floor line?
+          ball.y + ball.r >= (bin.y + bin.height - bin.wallThickness) &&
+          // Is the ball horizontally between the two inner wall edges?
+          ball.x > (bin.x + bin.wallThickness) &&
+          ball.x < (bin.x + bin.width - bin.wallThickness) &&
+          // Ensure it was above that floor last frame
+          ball.y - ball.r < (bin.y + bin.height - bin.wallThickness)
+        ) {
+          // Snap the ball onto the bin floor
+          ball.y = (bin.y + bin.height - bin.wallThickness) - ball.r;
+          // Reverse & dampen vertical velocity
+          ball.vy *= -0.3;
+          // If the bounce is small, stop the ball in the bin
+          if (Math.abs(ball.vy) < 1) {
+            ball.inMotion = false;
+            checkLanding();
+            return;
+          }
+        }
+
+        // ──────────
+        // 2) GROUND CONTACT (only if not already stopped in bin)
+        // ──────────
         if (ball.y + ball.r >= groundY) {
           ball.y = groundY - ball.r;
           ball.inMotion = false;
@@ -231,7 +284,9 @@
           return;
         }
 
-        // If the ball flies off the left/top/right edges, treat it as a miss
+        // ──────────
+        // 3) OFF‐CANVAS MISS
+        // ──────────
         if (
           ball.x + ball.r < 0 ||
           ball.y + ball.r < 0 ||
@@ -242,16 +297,17 @@
           return;
         }
 
+        // 4) Continue animating
         drawScene();
         animationId = requestAnimationFrame(update);
       }
 
-      // -- After the ball stops, see if it fell inside the bin opening --
+      // -- After the ball stops, see if it landed in the bin opening --
       function checkLanding() {
         const ballBottom  = ball.y + ball.r;
         const ballCenterX = ball.x;
 
-        // Landed on ground AND X is within bin opening?
+        // Landed on ground AND X is within bin opening → score
         if (
           ballBottom >= groundY - 1 &&
           ballCenterX >= bin.x + bin.wallThickness &&
@@ -266,7 +322,7 @@
           // Prepare next shot after a short pause
           setTimeout(resetBall, 700);
         } else {
-          // No shots left → show Game Over screen
+          // No shots left → show Game Over
           setTimeout(showGameOver, 700);
         }
         drawScene();
@@ -306,7 +362,6 @@
 
       // -- Handle pointer/mouse/touch events so that the user can "drag & flick" the ball --
       function onPointerDown(e) {
-        // Prevent default scrolling on touch
         e.preventDefault();
         const rect = canvas.getBoundingClientRect();
         const clientX = (e.clientX !== undefined ? e.clientX : e.touches[0].clientX);
