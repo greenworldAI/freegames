@@ -307,11 +307,16 @@
         const ballBottom  = ball.y + ball.r;
         const ballCenterX = ball.x;
 
-        // Landed on ground AND X is within bin opening → score
+        // ──────────
+        // NEW LOGIC: Any time the ball’s center‐X is between the two vertical walls,
+        // AND the ball’s bottom is anywhere between the bin top (bin.y) and groundY,
+        // count it as “in the bin.”
+        // ──────────
         if (
-          ballBottom >= groundY - 1 &&
           ballCenterX >= bin.x + bin.wallThickness &&
-          ballCenterX <= bin.x + bin.width - bin.wallThickness
+          ballCenterX <= bin.x + bin.width - bin.wallThickness &&
+          ballBottom >= bin.y &&
+          ballBottom <= groundY
         ) {
           score++;
         }
