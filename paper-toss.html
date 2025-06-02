@@ -4,7 +4,9 @@
   <meta charset="UTF-8" />
   <title>Zentroll Paper Toss</title>
   <style>
-    /* Reset & basic styles */
+    /* -------------------------------------------
+       BASIC RESET & LAYOUT
+       ------------------------------------------- */
     * {
       margin: 0;
       padding: 0;
@@ -13,19 +15,19 @@
     html, body {
       width: 100%;
       height: 100%;
+      background: #e0f7fa; /* light bluish background */
       overflow: hidden;
-      background: #e0f7fa;
       font-family: sans-serif;
     }
+
+    /* Container holds scoreboard + canvas + game-over overlay */
     #gameContainer {
       position: relative;
       width: 100%;
       height: 100%;
     }
-    canvas {
-      display: block;
-      background: #b3e5fc;
-    }
+
+    /* Scoreboard at the very top, above the canvas */
     #scoreBoard {
       position: absolute;
       top: 10px;
@@ -36,7 +38,21 @@
       font-weight: bold;
       text-shadow: 1px 1px #fff;
       z-index: 2;
+      pointer-events: none;
     }
+
+    /* The canvas takes up the entire remaining viewport below the scoreboard */
+    #gameCanvas {
+      position: absolute;
+      top: 0;              /* alignment start */
+      left: 0;
+      width: 100%;
+      height: calc(100vh - 50px); /* leave ~50px for the scoreboard */
+      background: #b3e5fc; /* slightly darker sky blue */
+      display: block;
+    }
+
+    /* Game-Over screen (hidden until end of 5 shots) */
     #gameOverScreen {
       position: absolute;
       top: 0;
@@ -71,8 +87,8 @@
 </head>
 <body>
   <div id="gameContainer">
-    <canvas id="gameCanvas"></canvas>
     <div id="scoreBoard">Shots Left: 5  |  Score: 0</div>
+    <canvas id="gameCanvas"></canvas>
     <div id="gameOverScreen">
       <div id="gameOverText">Game Over<br />Score: 0 / 5</div>
       <button id="restartBtn">Play Again</button>
@@ -88,36 +104,40 @@
       const gameOverText = document.getElementById('gameOverText');
       const restartBtn = document.getElementById('restartBtn');
 
-      // -- Canvas sizing (full width, 75% of width for height) --
-      function resizeCanvas() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerWidth * 0.75; 
-        if (canvas.height > window.innerHeight) {
-          canvas.height = window.innerHeight;
-        }
-        drawScene(); // redraw on resize
-      }
-      window.addEventListener('resize', resizeCanvas);
-      resizeCanvas();
-
-      // -- Game variables --
+      // -- Game state variables --
       let ball, bin, groundY;
       let isDragging = false;
-      let dragStartX = 0, dragStartY = 0;
       let dragCurrentX = 0, dragCurrentY = 0;
       let shotsLeft = 5;
       let score = 0;
+      let wind = 0;
       let animationId = null;
-      let wind = 0; // horizontal acceleration
-      const gravity = 0.5; // vertical acceleration
-      const powerFactor = 0.15; // velocity scale from drag
 
-      // -- Initialize ball and bin positions/sizes --
+      const gravity = 0.5;
+      const powerFactor = 0.15;
+
+      /** 
+       * Resize the canvas to fill its CSS dimensions 
+       * (width:100%, height:calc(100vh-50px)) 
+       * and then re-initialize everything.
+       */
+      function resizeCanvas() {
+        // Set the internal drawing buffer to match the CSS size
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
+
+        // Re-initialize the ball/bin positions based on new size
+        initGameObjects();
+        updateScoreboard();
+        drawScene();
+      }
+
+      // -- Initialize positions/sizes of ball and bin --
       function initGameObjects() {
-        // Ground line at 90% of canvas height
+        // Define ground line at 90% of canvas height
         groundY = canvas.height * 0.9;
 
-        // Ball starts at 10% width, 80% height
+        // Ball starts near left, just above the ground
         const startX = canvas.width * 0.1;
         const startY = groundY - 20;
         ball = {
@@ -129,7 +149,7 @@
           inMotion: false
         };
 
-        // Bin on right side: width 10% of canvas, height 20% of canvas
+        // Bin is on the right side: 10% of canvas width, 20% of canvas height
         const binWidth = canvas.width * 0.1;
         const binHeight = canvas.height * 0.2;
         bin = {
@@ -141,18 +161,17 @@
         };
       }
 
-      // -- Drawing functions --
+      // -- Draw ground, bin, ball, and any aim-line if dragging --
       function drawScene() {
-        // Clear
+        // Clear entire canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Draw sky background (already set by CSS)
-        // Draw ground
-        ctx.fillStyle = '#8d6e63';
+        // Draw ground rectangle
+        ctx.fillStyle = '#8d6e63'; // brown ground
         ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
 
-        // Draw bin (open-top box)
-        ctx.fillStyle = '#546e7a';
+        // Draw bin (a left wall, right wall, and bottom):
+        ctx.fillStyle = '#546e7a'; // dark gray/blue
         // Left wall
         ctx.fillRect(bin.x, bin.y, bin.wallThickness, bin.height);
         // Right wall
@@ -160,7 +179,7 @@
         // Bottom
         ctx.fillRect(bin.x, bin.y + bin.height - bin.wallThickness, bin.width, bin.wallThickness);
 
-        // Draw ball
+        // Draw paper ball (circle)
         ctx.beginPath();
         ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
         ctx.fillStyle = '#ffffff';
@@ -170,7 +189,7 @@
         ctx.stroke();
         ctx.closePath();
 
-        // If dragging, draw the aim line
+        // If the user is currently dragging, draw an aim-line
         if (isDragging) {
           ctx.beginPath();
           ctx.moveTo(ball.x, ball.y);
@@ -182,19 +201,20 @@
         }
       }
 
-      // -- Update loop for physics --
+      // -- Main physics loop (called via requestAnimationFrame) --
       function update() {
         if (!ball.inMotion) {
           drawScene();
           return;
         }
-        // Apply gravity & wind
+
+        // Apply gravity and a tiny bit of wind
         ball.vy += gravity;
         ball.vx += wind;
         ball.x += ball.vx;
         ball.y += ball.vy;
 
-        // Check for ground collision
+        // Check ground collision
         if (ball.y + ball.r >= groundY) {
           ball.y = groundY - ball.r;
           ball.inMotion = false;
@@ -202,15 +222,12 @@
           return;
         }
 
-        // Off-screen check (left or top)
-        if (ball.x - ball.r < 0 || ball.y - ball.r < 0) {
-          ball.inMotion = false;
-          checkLanding();
-          return;
-        }
-
-        // If ball flies far right beyond bin area
-        if (ball.x - ball.r > canvas.width) {
+        // If the ball goes off left/top/right edges, treat it as “missed”
+        if (
+          ball.x + ball.r < 0 ||
+          ball.y + ball.r < 0 ||
+          ball.x - ball.r > canvas.width
+        ) {
           ball.inMotion = false;
           checkLanding();
           return;
@@ -220,36 +237,37 @@
         animationId = requestAnimationFrame(update);
       }
 
-      // -- Check if ball landed inside bin --
+      // -- After the ball stops, check if it landed in the bin opening --
       function checkLanding() {
-        const bottomY = ball.y + ball.r;
-        const centerX = ball.x;
-        // If bottomY is exactly groundY and centerX within bin opening
+        const ballBottom = ball.y + ball.r;
+        const ballCenterX = ball.x;
+
+        // Landed exactly on ground and X is within bin opening?
         if (
-          bottomY >= groundY - 1 &&
-          centerX >= bin.x + bin.wallThickness &&
-          centerX <= bin.x + bin.width - bin.wallThickness
+          ballBottom >= groundY - 1 &&
+          ballCenterX >= bin.x + bin.wallThickness &&
+          ballCenterX <= bin.x + bin.width - bin.wallThickness
         ) {
-          // Successful toss
           score++;
         }
+
         updateScoreboard();
         if (shotsLeft > 0) {
-          // Reset ball after short delay
-          setTimeout(resetBall, 800);
+          // Reset for next shot after a short pause
+          setTimeout(resetBall, 700);
         } else {
-          // Game over
-          setTimeout(showGameOver, 800);
+          // No shots left → show Game Over
+          setTimeout(showGameOver, 700);
         }
         drawScene();
       }
 
-      // -- Update scoreboard text --
+      // -- Update the “Shots Left” and “Score” text at top --
       function updateScoreboard() {
         scoreBoard.textContent = `Shots Left: ${shotsLeft}  |  Score: ${score}`;
       }
 
-      // -- Reset ball to start position for next shot --
+      // -- Put the ball back at its starting spot, reset velocities/wind --
       function resetBall() {
         ball.x = canvas.width * 0.1;
         ball.y = groundY - ball.r - 5;
@@ -260,13 +278,13 @@
         drawScene();
       }
 
-      // -- Show Game Over overlay --
+      // -- Display the Game Over overlay and final score --
       function showGameOver() {
-        gameOverText.innerHTML = `Game Over<br />Score: ${score} / 5`;
+        gameOverText.innerHTML = `Game Over<br/>Score: ${score} / 5`;
         gameOverScreen.style.visibility = 'visible';
       }
 
-      // -- Restart game --
+      // -- Reset entire game state (5 shots, score = 0) --
       function restartGame() {
         shotsLeft = 5;
         score = 0;
@@ -276,49 +294,55 @@
         drawScene();
       }
 
-      // -- Event handlers for dragging/flick --
+      // -- Handle pointer/mouse/touch events to “drag & flick” the ball -- 
       function onPointerDown(e) {
+        // Don’t let default scrolling on touch devices interfere
         e.preventDefault();
         const rect = canvas.getBoundingClientRect();
-        const px = (e.clientX || e.touches[0].clientX) - rect.left;
-        const py = (e.clientY || e.touches[0].clientY) - rect.top;
-        const dist = Math.hypot(px - ball.x, py - ball.y);
-        if (dist <= ball.r && !ball.inMotion && shotsLeft > 0) {
+        const clientX = (e.clientX !== undefined ? e.clientX : e.touches[0].clientX);
+        const clientY = (e.clientY !== undefined ? e.clientY : e.touches[0].clientY);
+        const px = clientX - rect.left;
+        const py = clientY - rect.top;
+        const distance = Math.hypot(px - ball.x, py - ball.y);
+
+        // Only start drag if user tapped inside the ball, ball is not already moving, and shots remain
+        if (distance <= ball.r && !ball.inMotion && shotsLeft > 0) {
           isDragging = true;
-          dragStartX = px;
-          dragStartY = py;
         }
       }
       function onPointerMove(e) {
         if (!isDragging) return;
         const rect = canvas.getBoundingClientRect();
-        dragCurrentX = (e.clientX || e.touches[0].clientX) - rect.left;
-        dragCurrentY = (e.clientY || e.touches[0].clientY) - rect.top;
+        const clientX = (e.clientX !== undefined ? e.clientX : e.touches[0].clientX);
+        const clientY = (e.clientY !== undefined ? e.clientY : e.touches[0].clientY);
+        dragCurrentX = clientX - rect.left;
+        dragCurrentY = clientY - rect.top;
         drawScene();
       }
       function onPointerUp(e) {
         if (!isDragging) return;
         isDragging = false;
         const rect = canvas.getBoundingClientRect();
-        const px = (e.clientX || e.changedTouches[0].clientX) - rect.left;
-        const py = (e.clientY || e.changedTouches[0].clientY) - rect.top;
-        dragCurrentX = px;
-        dragCurrentY = py;
+        const clientX = (e.clientX !== undefined ? e.clientX : e.changedTouches[0].clientX);
+        const clientY = (e.clientY !== undefined ? e.clientY : e.changedTouches[0].clientY);
+        dragCurrentX = clientX - rect.left;
+        dragCurrentY = clientY - rect.top;
 
-        // Compute velocity vector from ball center to dragEnd
+        // Compute velocity vector: from ball.x/ball.y toward dragCurrentX/dragCurrentY
         const dx = dragCurrentX - ball.x;
         const dy = dragCurrentY - ball.y;
         ball.vx = dx * powerFactor;
         ball.vy = dy * powerFactor;
         ball.inMotion = true;
         shotsLeft--;
-        // Random wind each shot between -0.1 and 0.1
+
+        // Give a tiny random wind push each shot
         wind = (Math.random() * 0.2 - 0.1);
         updateScoreboard();
         animationId = requestAnimationFrame(update);
       }
 
-      // -- Attach event listeners --
+      // -- Attach event listeners for mouse+touch --
       canvas.addEventListener('mousedown', onPointerDown);
       canvas.addEventListener('touchstart', onPointerDown, { passive: false });
       canvas.addEventListener('mousemove', onPointerMove);
@@ -328,13 +352,9 @@
 
       restartBtn.addEventListener('click', restartGame);
 
-      // -- Initialize everything on load --
-      function start() {
-        initGameObjects();
-        updateScoreboard();
-        drawScene();
-      }
-      start();
+      // -- When window loads or resizes, re-size the canvas and redraw everything --
+      window.addEventListener('load', resizeCanvas);
+      window.addEventListener('resize', resizeCanvas);
     })();
   </script>
 </body>
